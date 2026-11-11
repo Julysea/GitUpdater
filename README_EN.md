@@ -199,6 +199,7 @@ AssetFile=myapp-[$tag].zip
 * Must exactly match the asset file name in the GitHub Release (after placeholder replacement).
 * If not filled in or no match is found after replacement, a list of available assets is shown.
 * No automatic selection; no built-in repository rules.
+* **Note**: `[$ver]` does **not** include the leading `v` after replacement. If the actual asset filename contains a `v` (e.g., `TriliumNotes-v0.107.0-windows-x64.zip`), write it as `TriliumNotes-v[$ver]-windows-x64.zip`; otherwise it resolves to `TriliumNotes-0.107.0-windows-x64.zip` and fails to match.
 
 ## Extraction and Download Strategy
 

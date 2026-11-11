@@ -199,6 +199,7 @@ AssetFile=myapp-[$tag].zip
 * 必须和 GitHub Release 里的资源文件名完全一致（占位符替换后）。
 * 不填写或填写后没有匹配项时，会显示可用资源列表。
 * 不做自动选择，不内置任何仓库规则。
+* **注意**：`[$ver]` 替换后**不包含**开头的 `v`。如果实际资源文件名中包含 `v`（例如 `TriliumNotes-v0.107.0-windows-x64.zip`），需要写成 `TriliumNotes-v[$ver]-windows-x64.zip`，否则会解析为 `TriliumNotes-0.107.0-windows-x64.zip` 导致匹配失败。
 
 ## 解压与下载策略
 

@@ -12,6 +12,11 @@
 ; [$ver] = latest tag without the leading v (v0.24.0-rc.1 -> 0.24.0-rc.1)
 ; [$tag] = full latest tag (v0.24.0-rc.1)
 ;
+; NOTE: [$ver] does NOT include the 'v' prefix. If the actual asset filename
+; contains a 'v' before the version number (e.g. TriliumNotes-v0.107.0-...),
+; you must write: TriliumNotes-v[$ver]-...
+; Otherwise it will resolve to TriliumNotes-0.107.0-... and fail to match.
+;
 ; The install folder is always the folder containing GitUpdater.exe.
 ; GitUpdater does not start the target application after updating.
 ; Archives are extracted automatically (zip, 7z, rar, tar, tar.gz,
