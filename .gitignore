@@ -1,0 +1,4 @@
+*.exe
+gitupdater.ini
+gitupdater.log
+.gitupdater_tmp/

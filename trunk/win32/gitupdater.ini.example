@@ -1,0 +1,39 @@
+; Copy this file to gitupdater.ini to skip the first-run settings window.
+; SoftwareUrl and AssetFile are required. If either is empty, the settings
+; window is shown again.
+;
+; Examples:
+;   SoftwareUrl=https://github.com/anomalyco/opencode
+;   AssetFile=opencode-windows-x64.zip
+;
+;   SoftwareUrl=https://github.com/marktext/marktext
+;   AssetFile=marktext-win-x64-[$ver].zip
+;
+; [$ver] = latest tag without the leading v (v0.24.0-rc.1 -> 0.24.0-rc.1)
+; [$tag] = full latest tag (v0.24.0-rc.1)
+;
+; The install folder is always the folder containing GitUpdater.exe.
+; GitUpdater does not start the target application after updating.
+; Archives are extracted automatically (zip, 7z, rar, tar, tar.gz,
+; tar.bz2, tar.xz). Other files are downloaded only and kept.
+
+[General]
+Update=ask
+UpdateOnceADay=no
+LogFile=gitupdater.log
+
+[Internet]
+SoftwareUrl=
+AssetFile=
+UserAgent=GitUpdater/1.0
+DownloadRetries=2
+
+[Extract]
+StripRootFolder=yes
+DeleteDownloadedFiles=yes
+
+[Error]
+SupressInetRead=no
+
+[Meta]
+ConfigVersion=1
