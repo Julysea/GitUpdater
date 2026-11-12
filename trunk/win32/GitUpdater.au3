@@ -44,6 +44,7 @@ Global $g_update = 'ask'
 Global $g_onceADay = 'no'
 Global $g_deleteDownloaded = 'yes'
 Global $g_stripRoot = 'yes'
+Global $g_binPath = ''
 Global $g_logFile = 'gitupdater.log'
 Global $g_apiToken = ''
 Global $g_userAgent = 'GitUpdater/1.0'
@@ -274,7 +275,7 @@ Func Main()
 		If $g_statusCompleteValue <> 0 Then GUICtrlSetData($g_statusCompleteValue, '0 %')
 	EndIf
 
-	If Not ProcessDownload($g_downloadFile, $g_installPath) Then
+	If Not ProcessDownload($g_downloadFile, $g_installPath, $tag) Then
 		FatalError(T('Could not process the downloaded file:', '无法处理下载的文件：') & @CRLF & $g_downloadFile)
 		GUIDelete($g_statusForm)
 		CleanUpDownload()
@@ -307,7 +308,7 @@ EndFunc
 ; Settings
 ; ---------------------------------------------------------------------------
 Func ShowSettings()
-	Local $form = GUICreate(T('GitUpdater Settings', 'GitUpdater 设置'), 520, 450)
+	Local $form = GUICreate(T('GitUpdater Settings', 'GitUpdater 设置'), 520, 520)
 	Local $lblSoftware = GUICtrlCreateLabel(T('GitHub repository:', 'GitHub 仓库：'), 8, 10, 496, 17)
 	Local $hintSoftware = GUICtrlCreateLabel(T('Example: https://github.com/anomalyco/opencode', '示例：https://github.com/anomalyco/opencode'), 8, 30, 496, 17)
 	Local $edtSoftware = GUICtrlCreateInput($g_softwareUrl, 8, 50, 496, 21)
@@ -320,12 +321,14 @@ Func ShowSettings()
 	Local $chkOnce = GUICtrlCreateCheckbox(T('Limit update check to once a day', '每天只检查一次更新'), 8, 200, 496, 17)
 	Local $chkDelete = GUICtrlCreateCheckbox(T('Delete downloaded archive after extraction', '解压后删除下载的压缩包'), 8, 228, 496, 17)
 	Local $chkStrip = GUICtrlCreateCheckbox(T('Strip a single root folder from the archive', '自动去掉压缩包的单层根目录'), 8, 256, 496, 17)
-	Local $lblArchiveHint = GUICtrlCreateLabel(T('Archives: extract automatically; other formats: download only.', '压缩包会自动解压升级；其他格式只下载，不处理。'), 8, 290, 496, 17)
-	Local $lblArchiveFormats = GUICtrlCreateLabel(T('Supported: zip, 7z, rar, tar, tar.gz, tar.bz2, tar.xz', '支持：zip、7z、rar、tar、tar.gz、tar.bz2、tar.xz'), 8, 310, 496, 17)
-	Local $lblLog = GUICtrlCreateLabel(T('Log file:', '日志文件：'), 8, 344, 496, 17)
-	Local $edtLog = GUICtrlCreateInput($g_logFile, 8, 364, 496, 21)
-	Local $btnOk = GUICtrlCreateButton($g_tOKButton, 416, 410, 80, 25, $WS_GROUP)
-	Local $btnCancel = GUICtrlCreateButton($g_tCancelButton, 330, 410, 80, 25, $WS_GROUP)
+	Local $lblBinPath = GUICtrlCreateLabel(T('Extract path in archive (empty = all):', '指定释放内容路径（默认为空，表示全部）：'), 8, 284, 496, 17)
+	Local $edtBinPath = GUICtrlCreateInput($g_binPath, 8, 304, 496, 21)
+	Local $lblArchiveHint = GUICtrlCreateLabel(T('Archives: extract automatically; other formats: download only.', '压缩包会自动解压升级；其他格式只下载，不处理。'), 8, 334, 496, 17)
+	Local $lblArchiveFormats = GUICtrlCreateLabel(T('Supported: zip, 7z, rar, tar, tar.gz, tar.bz2, tar.xz', '支持：zip、7z、rar、tar、tar.gz、tar.bz2、tar.xz'), 8, 354, 496, 17)
+	Local $lblLog = GUICtrlCreateLabel(T('Log file:', '日志文件：'), 8, 384, 496, 17)
+	Local $edtLog = GUICtrlCreateInput($g_logFile, 8, 404, 496, 21)
+	Local $btnOk = GUICtrlCreateButton($g_tOKButton, 416, 460, 80, 25, $WS_GROUP)
+	Local $btnCancel = GUICtrlCreateButton($g_tCancelButton, 330, 460, 80, 25, $WS_GROUP)
 	Local $msg = 0
 	Local $updateLabels = ''
 	Local $updateSelection = ''
@@ -390,6 +393,7 @@ Func ShowSettings()
 	$g_onceADay = CheckboxValue($chkOnce)
 	$g_deleteDownloaded = CheckboxValue($chkDelete)
 	$g_stripRoot = CheckboxValue($chkStrip)
+	$g_binPath = StringStripWS(GUICtrlRead($edtBinPath), 3)
 	$g_logFile = StringStripWS(GUICtrlRead($edtLog), 3)
 
 	If $g_update = '' Then $g_update = 'ask'
@@ -530,6 +534,7 @@ Func SaveSettings()
 
 	IniWrite($g_iniFile, 'Extract', 'StripRootFolder', $g_stripRoot)
 	IniWrite($g_iniFile, 'Extract', 'DeleteDownloadedFiles', $g_deleteDownloaded)
+	IniWrite($g_iniFile, 'Extract', 'BinPath', $g_binPath)
 
 	IniWrite($g_iniFile, 'Error', 'SupressInetRead', $g_suppressErrors)
 	IniWrite($g_iniFile, 'Meta', 'ConfigVersion', '1')
@@ -549,6 +554,7 @@ Func LoadSettings()
 
 	$g_stripRoot = IniRead($g_iniFile, 'Extract', 'StripRootFolder', $g_stripRoot)
 	$g_deleteDownloaded = IniRead($g_iniFile, 'Extract', 'DeleteDownloadedFiles', $g_deleteDownloaded)
+	$g_binPath = IniRead($g_iniFile, 'Extract', 'BinPath', $g_binPath)
 
 	$g_suppressErrors = IniRead($g_iniFile, 'Error', 'SupressInetRead', $g_suppressErrors)
 
@@ -1058,7 +1064,7 @@ Func DownloadAsset($assetUrl, $assetSize, $tag, $releaseBody)
 	Return True
 EndFunc
 
-Func ProcessDownload($archive, $destDir)
+Func ProcessDownload($archive, $destDir, $newTag)
 	Local $tmpDir = $destDir & '.gitupdater_tmp'
 	Local $kind = GetArchiveKind($archive)
 	Local $cmd = ''
@@ -1067,6 +1073,9 @@ Func ProcessDownload($archive, $destDir)
 	Local $root = ''
 	Local $copyOk = False
 	Local $sevenZip = ''
+	Local $binDir = ''
+	Local $oldDirs = 0
+	Local $ver = StringRegExpReplace($newTag, '^[vVMm]', '')
 
 	$g_didProcess = False
 
@@ -1109,22 +1118,107 @@ Func ProcessDownload($archive, $destDir)
 		Return False
 	EndIf
 
-	$srcDir = $tmpDir
-	If $g_stripRoot = 'yes' Then
-		$root = FindSingleRoot($tmpDir)
-		If $root <> '' Then $srcDir = $root
+	; Locate the configured path inside the extracted archive
+	If $g_binPath <> '' Then
+		$binDir = FindPathInArchive($tmpDir, $g_binPath)
+		If $binDir <> '' Then
+			$srcDir = $binDir
+			LogW('Using configured path: ' & $binDir)
+		EndIf
+	EndIf
+	If $binDir = '' Then
+		$srcDir = $tmpDir
+		If $g_stripRoot = 'yes' Then
+			$root = FindSingleRoot($tmpDir)
+			If $root <> '' Then $srcDir = $root
+		EndIf
 	EndIf
 
 	LogW('Copying extracted files: ' & $srcDir & ' -> ' & $destDir)
 	$copyOk = CopyTree($srcDir, $destDir)
 	If Not $copyOk Then
 		LogW('[ERROR] Some files could not be copied. Temporary folder kept: ' & $tmpDir)
+		DirRemove($tmpDir, 1)
 		Return False
+	EndIf
+
+	; Remove old version directories (directories whose name starts with a version pattern)
+	$oldDirs = RemoveOldVersionDirs($destDir, $ver)
+	If $oldDirs > 0 Then
+		LogW('Removed ' & $oldDirs & ' old version directory(ies)')
 	EndIf
 
 	DirRemove($tmpDir, 1)
 	$g_didProcess = True
 	Return True
+EndFunc
+
+; Find the directory at the given path (case-insensitive) inside $dir.
+; Supports single-level paths like "BIN" or nested paths like "foo/bar".
+Func FindPathInArchive($dir, $path)
+	Local $parts = StringSplit($path, '/')
+	Local $current = $dir
+	Local $i = 0
+
+	For $i = 1 To $parts[0]
+		$current = FindChildDir($current, $parts[$i])
+		If $current = '' Then Return ''
+	Next
+	Return $current
+EndFunc
+
+; Find a child directory named $name (case-insensitive) under $parent.
+Func FindChildDir($parent, $name)
+	Local $hFind = FileFindFirstFile($parent & '\*')
+	Local $item = ''
+	Local $isDir = 0
+
+	While True
+		$item = FileFindNextFile($hFind)
+		If @error Then ExitLoop
+		$isDir = @extended
+		If $isDir And StringCompare($item, $name, 0) = 0 Then
+			FileClose($hFind)
+			Return $parent & '\' & $item
+		EndIf
+	WEnd
+	FileClose($hFind)
+	Return ''
+EndFunc
+
+; Remove directories in $destDir whose name looks like a version number
+; but is NOT the current version. A version directory matches patterns like
+; "156.0.8078", "156.0.8078.80", "156.0.8078_80", etc.
+Func RemoveOldVersionDirs($destDir, $currentVer)
+	Local $count = 0
+	Local $hFind = FileFindFirstFile($destDir & '\*')
+	Local $name = ''
+	Local $isDir = 0
+	Local $verPattern = '^\d+\.\d+'
+
+	While True
+		$name = FileFindNextFile($hFind)
+		If @error Then ExitLoop
+		$isDir = @extended
+		If Not $isDir Then ContinueLoop
+
+		; Skip if it matches the current version
+		If StringInStr($name, $currentVer) > 0 Then ContinueLoop
+
+		; Check if the name looks like a version directory
+		If StringRegExp($name, $verPattern) Then
+			Local $fullPath = $destDir & '\' & $name
+			LogW('Removing old version directory: ' & $fullPath)
+			DirRemove($fullPath, 1)
+			If @error Then
+				LogW('[WARN] Could not remove: ' & $fullPath)
+			Else
+				$count += 1
+			EndIf
+		EndIf
+	WEnd
+	FileClose($hFind)
+	Return $count
 EndFunc
 
 Func GetArchiveKind($fileName)
