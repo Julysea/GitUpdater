@@ -227,14 +227,31 @@ Func Main()
 
 	$resolvedAsset = ResolveAssetName($g_assetFile, $tag)
 	$assetIndex = PickAsset($assets, $resolvedAsset)
-	If $assetIndex = -1 Then
-		For $i = 0 To UBound($assets) - 1
-			$available &= @CRLF & '  - ' & $assets[$i][0]
-		Next
-		$assetInfo = $g_assetFile
-		If $resolvedAsset <> $g_assetFile Then $assetInfo &= ' -> ' & $resolvedAsset
-		FatalError(T('No release asset matched the configured file name:', '没有找到匹配的资源文件：') & @CRLF & $assetInfo & @CRLF & @CRLF & T('Available assets:', '可用资源：') & $available)
-		okExit()
+	Local $isExactMatch = ($assetIndex >= 0)
+
+	; The configured file name does not exist in the release. Find the closest
+	; asset name and always ask the user before downloading a different file.
+	If Not $isExactMatch Then
+		Local $nearScore = 0
+		$assetIndex = FindClosestAsset($assets, $resolvedAsset, $nearScore)
+		If $assetIndex = -1 Then
+			$available = ''
+			For $i = 0 To UBound($assets) - 1
+				$available &= @CRLF & '  - ' & $assets[$i][0]
+			Next
+			$assetInfo = $g_assetFile
+			If $resolvedAsset <> $g_assetFile Then $assetInfo &= ' -> ' & $resolvedAsset
+			FatalError(T('No release asset matched the configured file name:', '没有找到匹配的资源文件：') & @CRLF & $assetInfo & @CRLF & @CRLF & T('Available assets:', '可用资源：') & $available)
+			okExit()
+		EndIf
+
+		LogW('No exact asset. Closest match: ' & $assets[$assetIndex][0] & ' (' & Round($nearScore) & '%)')
+		If Not ConfirmAsset($g_assetFile, $resolvedAsset, $assets[$assetIndex][0], $nearScore, $tag, $releaseBody, $assets) Then
+			LogW('Closest asset declined by user: ' & $assets[$assetIndex][0])
+			IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
+			okExit()
+		EndIf
+		LogW('Closest asset accepted by user: ' & $assets[$assetIndex][0])
 	EndIf
 
 	$assetName = $assets[$assetIndex][0]
@@ -415,6 +432,51 @@ Func ConfirmUpdate($repo, $current, $version, $notes)
 			EndSwitch
 		EndIf
 	WEnd
+EndFunc
+
+Func ConfirmAsset($configured, $resolved, $matched, $score, $version, $notes, $assets)
+	Local $form = GUICreate('GitUpdater', 520, 520)
+	Local $lblTitle = GUICtrlCreateLabel(T('The configured file name was not found in this release.', '该 Release 中没有配置的文件名。'), 8, 10, 496, 17)
+	Local $lblQuestion = GUICtrlCreateLabel(T('Download the closest file instead?', '是否下载名称最接近的文件？'), 8, 32, 496, 17)
+	Local $lblVersion = GUICtrlCreateLabel(T('Available: ', '可用版本：') & $version, 8, 58, 496, 17)
+	Local $lblConfigured = GUICtrlCreateLabel(T('Configured file: ', '配置的文件：') & $configured, 8, 80, 496, 17)
+	Local $lblResolved = GUICtrlCreateLabel(T('Looked for: ', '查找的文件：') & $resolved, 8, 102, 496, 17)
+	Local $lblMatched = GUICtrlCreateLabel(T('Closest file: ', '最接近的文件：') & $matched, 8, 124, 496, 17)
+	Local $lblScore = GUICtrlCreateLabel(T('Similarity: ', '相似度：') & Round($score) & ' %', 8, 146, 496, 17)
+	Local $lblFiles = GUICtrlCreateLabel(T('Available files:', '可用文件：'), 8, 174, 496, 17)
+	Local $editFiles = GUICtrlCreateEdit(BuildAssetList($assets), 8, 196, 496, 248, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $ES_AUTOHSCROLL, $ES_READONLY, $ES_WANTRETURN, $WS_HSCROLL, $WS_VSCROLL))
+	Local $btnYes = GUICtrlCreateButton($g_tYesButton, 416, 460, 80, 25, $WS_GROUP)
+	Local $btnNo = GUICtrlCreateButton($g_tNoButton, 330, 460, 80, 25, $WS_GROUP)
+	Local $msg = 0
+
+	GUICtrlSetColor($lblQuestion, 0x0000AA)
+	GUICtrlSetTip($lblMatched, $matched)
+	GUICtrlSetState($btnYes, $GUI_FOCUS)
+	GUISetState(@SW_SHOW, $form)
+	WinActivate($form)
+
+	While True
+		$msg = GUIGetMsg()
+		If $msg <> 0 Then
+			Switch $msg
+				Case $GUI_EVENT_CLOSE, $btnNo
+					GUIDelete($form)
+					Return False
+				Case $btnYes
+					GUIDelete($form)
+					Return True
+			EndSwitch
+		EndIf
+	WEnd
+EndFunc
+
+Func BuildAssetList($assets)
+	Local $result = ''
+	Local $i = 0
+	For $i = 0 To UBound($assets) - 1
+		$result &= '  - ' & $assets[$i][0] & @CRLF
+	Next
+	Return $result
 EndFunc
 
 Func PrepareNotes($notes)
@@ -739,9 +801,88 @@ Func PickAsset($assets, $assetFile)
 
 	$wanted = StringLower(StringStripWS($assetFile, 3))
 	For $i = 0 To UBound($assets) - 1
-		If StringLower($assets[$i][0]) = $wanted Then Return $i
+		If StringLower(StringStripWS($assets[$i][0], 3)) = $wanted Then Return $i
 	Next
 	Return -1
+EndFunc
+
+; Find the asset whose name is closest to $assetFile. Returns the index or -1
+; when even the best candidate is not similar enough. $bestScore receives the
+; similarity in percent (0-100). Files with a different extension are skipped
+; so a .zip request never matches an .exe by accident.
+Func FindClosestAsset($assets, $assetFile, ByRef $bestScore)
+	Local $i = 0
+	Local $ext = GetFileExt($assetFile)
+	Local $score = 0
+	Local $idx = -1
+	$bestScore = 0
+	If UBound($assets) = 0 Then Return -1
+
+	For $i = 0 To UBound($assets) - 1
+		If $ext <> '' And GetFileExt($assets[$i][0]) <> $ext Then ContinueLoop
+		$score = NameSimilarity($assetFile, $assets[$i][0])
+		If $score > $bestScore Then
+			$bestScore = $score
+			$idx = $i
+		EndIf
+	Next
+
+	If $idx = -1 Or $bestScore < 70 Then Return -1
+	Return $idx
+EndFunc
+
+Func GetFileExt($name)
+	Local $m = StringRegExp($name, '\.([^.\\/]+)$', 1)
+	If @error Then Return ''
+	Return StringLower($m[0])
+EndFunc
+
+Func NameSimilarity($a, $b)
+	Local $s = StringLower(StringStripWS($a, 3))
+	Local $t = StringLower(StringStripWS($b, 3))
+	Local $maxLen = StringLen($s)
+	If StringLen($t) > $maxLen Then $maxLen = StringLen($t)
+	If $maxLen = 0 Then Return 100
+	Return (1 - Levenshtein($s, $t) / $maxLen) * 100
+EndFunc
+
+Func Levenshtein($s, $t)
+	Local $n = StringLen($s)
+	Local $m = StringLen($t)
+	Local $i = 0, $j = 0, $cost = 0
+	Local $ca = '', $cb = ''
+	If $n = 0 Then Return $m
+	If $m = 0 Then Return $n
+
+	Local $prev[$m + 1]
+	Local $cur[$m + 1]
+	For $j = 0 To $m
+		$prev[$j] = $j
+	Next
+	For $i = 1 To $n
+		$cur[0] = $i
+		$ca = StringMid($s, $i, 1)
+		For $j = 1 To $m
+			$cb = StringMid($t, $j, 1)
+			If $ca = $cb Then
+				$cost = 0
+			Else
+				$cost = 1
+			EndIf
+			$cur[$j] = Min3($prev[$j] + 1, $cur[$j - 1] + 1, $prev[$j - 1] + $cost)
+		Next
+		For $j = 0 To $m
+			$prev[$j] = $cur[$j]
+		Next
+	Next
+	Return $prev[$m]
+EndFunc
+
+Func Min3($a, $b, $c)
+	Local $r = $a
+	If $b < $r Then $r = $b
+	If $c < $r Then $r = $c
+	Return $r
 EndFunc
 
 Func JsonUnescape($s)
