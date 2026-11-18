@@ -62,6 +62,7 @@ Global $g_statusCompleteLabel = 0
 Global $g_statusCompleteValue = 0
 Global $g_statusCloseButton = 0
 Global $g_didProcess = False
+Global $g_restartCount = 0
 
 ; Translations
 Global $g_tOKButton = '&Ok'
@@ -69,6 +70,7 @@ Global $g_tCancelButton = '&Cancel'
 Global $g_tYesButton = '&Yes'
 Global $g_tNoButton = '&No'
 Global $g_tCloseButton = '&Close'
+Global $g_tSettingsButton = '&Settings'
 Global $g_tStatusFormTitle = 'GitUpdater Status'
 Global $g_tStatusDownloadLabel = 'Downloading'
 Global $g_tStatusCompleteLabel = 'Complete'
@@ -97,6 +99,7 @@ Func Main()
 	Local $releaseUrl = ''
 	Local $releaseBody = ''
 	Local $lastVersion = ''
+	Local $lastRepo = ''
 	Local $currentText = ''
 	Local $assets = 0
 	Local $assetIndex = -1
@@ -108,6 +111,7 @@ Func Main()
 	Local $assetFile = ''
 	Local $resolvedAsset = ''
 	Local $assetInfo = ''
+	Local $assetChoice = ''
 	Local $willProcess = False
 
 	LogW('******** GitUpdater starting ********')
@@ -197,10 +201,12 @@ Func Main()
 	EndIf
 
 	$lastVersion = IniRead($g_iniFile, 'General', 'LastUpdatedVersion', '')
+	$lastRepo = IniRead($g_iniFile, 'General', 'LastUpdatedRepo', '')
+	If $lastRepo <> '' And $lastRepo <> GetSoftwareName($g_softwareUrl) Then $lastVersion = ''
 	If $lastVersion <> '' And Not $g_force And $lastVersion = $tag Then
 		LogW('Already up to date (same tag): ' & $tag)
+		If ShowNoUpdate($tag) = 'settings' Then RedefineSettings()
 		IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
-		ShowNoUpdate($tag)
 		okExit()
 	EndIf
 
@@ -247,7 +253,11 @@ Func Main()
 		EndIf
 
 		LogW('No exact asset. Closest match: ' & $assets[$assetIndex][0] & ' (' & Round($nearScore) & '%)')
-		If Not ConfirmAsset($g_assetFile, $resolvedAsset, $assets[$assetIndex][0], $nearScore, $tag, $releaseBody, $assets) Then
+		$assetChoice = ConfirmAsset($g_assetFile, $resolvedAsset, $assets[$assetIndex][0], $nearScore, $tag, $releaseBody, $assets)
+		If $assetChoice = 'settings' Then
+			LogW('Redefining configuration from asset prompt')
+			RedefineSettings()
+		ElseIf $assetChoice <> 'yes' Then
 			LogW('Closest asset declined by user: ' & $assets[$assetIndex][0])
 			IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
 			okExit()
@@ -291,6 +301,7 @@ Func Main()
 	If $g_statusCloseButton <> 0 Then GUICtrlSetData($g_statusCloseButton, $g_tCloseButton)
 	IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
 	IniWrite($g_iniFile, 'General', 'LastUpdatedVersion', $tag)
+	IniWrite($g_iniFile, 'General', 'LastUpdatedRepo', GetSoftwareName($g_softwareUrl))
 	If $releaseUrl <> '' Then IniWrite($g_iniFile, 'General', 'LastReleaseUrl', $releaseUrl)
 	CleanUpDownload()
 
@@ -408,7 +419,7 @@ Func CheckboxValue($ctrl)
 EndFunc
 
 Func ConfirmUpdate($repo, $current, $version, $notes)
-	Local $form = GUICreate('GitUpdater', 520, 500)
+	Local $form = GUICreate('GitUpdater - ' & GetSoftwareName($repo), 520, 500)
 	Local $lblTitle = GUICtrlCreateLabel(T('A new version is available.', '发现新版本。'), 8, 10, 496, 17)
 	Local $lblRepo = GUICtrlCreateLabel(T('Repository: ', '仓库：') & $repo, 8, 36, 496, 17)
 	Local $lblCurrent = GUICtrlCreateLabel(T('Installed: ', '当前版本：') & $current, 8, 60, 496, 17)
@@ -439,7 +450,7 @@ Func ConfirmUpdate($repo, $current, $version, $notes)
 EndFunc
 
 Func ConfirmAsset($configured, $resolved, $matched, $score, $version, $notes, $assets)
-	Local $form = GUICreate('GitUpdater', 520, 520)
+	Local $form = GUICreate('GitUpdater - ' & GetSoftwareName($g_softwareUrl), 520, 520)
 	Local $lblTitle = GUICtrlCreateLabel(T('The configured file name was not found in this release.', '该 Release 中没有配置的文件名。'), 8, 10, 496, 17)
 	Local $lblQuestion = GUICtrlCreateLabel(T('Download the closest file instead?', '是否下载名称最接近的文件？'), 8, 32, 496, 17)
 	Local $lblVersion = GUICtrlCreateLabel(T('Available: ', '可用版本：') & $version, 8, 58, 496, 17)
@@ -449,12 +460,14 @@ Func ConfirmAsset($configured, $resolved, $matched, $score, $version, $notes, $a
 	Local $lblScore = GUICtrlCreateLabel(T('Similarity: ', '相似度：') & Round($score) & ' %', 8, 146, 496, 17)
 	Local $lblFiles = GUICtrlCreateLabel(T('Available files:', '可用文件：'), 8, 174, 496, 17)
 	Local $editFiles = GUICtrlCreateEdit(BuildAssetList($assets), 8, 196, 496, 248, BitOR($ES_MULTILINE, $ES_AUTOVSCROLL, $ES_AUTOHSCROLL, $ES_READONLY, $ES_WANTRETURN, $WS_HSCROLL, $WS_VSCROLL))
+	Local $btnSettings = GUICtrlCreateButton($g_tSettingsButton, 202, 460, 120, 25, $WS_GROUP)
 	Local $btnYes = GUICtrlCreateButton($g_tYesButton, 416, 460, 80, 25, $WS_GROUP)
 	Local $btnNo = GUICtrlCreateButton($g_tNoButton, 330, 460, 80, 25, $WS_GROUP)
 	Local $msg = 0
 
 	GUICtrlSetColor($lblQuestion, 0x0000AA)
 	GUICtrlSetTip($lblMatched, $matched)
+	GUICtrlSetTip($btnSettings, T('Redefine the asset file name, then check for updates again', '重新定义资源文件名，然后重新检查更新'))
 	GUICtrlSetState($btnYes, $GUI_FOCUS)
 	GUISetState(@SW_SHOW, $form)
 	WinActivate($form)
@@ -465,10 +478,13 @@ Func ConfirmAsset($configured, $resolved, $matched, $score, $version, $notes, $a
 			Switch $msg
 				Case $GUI_EVENT_CLOSE, $btnNo
 					GUIDelete($form)
-					Return False
+					Return 'no'
 				Case $btnYes
 					GUIDelete($form)
-					Return True
+					Return 'yes'
+				Case $btnSettings
+					GUIDelete($form)
+					Return 'settings'
 			EndSwitch
 		EndIf
 	WEnd
@@ -500,13 +516,18 @@ Func WaitForStatusClose()
 	WEnd
 EndFunc
 
+; Shows the "already up to date" window. Returns 'close' or 'settings'.
 Func ShowNoUpdate($tag)
-	Local $form = GUICreate('GitUpdater', 420, 170)
-	Local $lblTitle = GUICtrlCreateLabel(T('You already have the latest version.', '当前已是最新版本。'), 16, 20, 388, 17)
-	Local $lblVersion = GUICtrlCreateLabel(T('Latest version: ', '最新版本：') & $tag, 16, 52, 388, 17)
-	Local $btnClose = GUICtrlCreateButton($g_tCloseButton, 170, 110, 80, 25, $WS_GROUP)
+	Local $form = GUICreate('GitUpdater - ' & GetSoftwareName($g_softwareUrl), 460, 200)
+	Local $lblTitle = GUICtrlCreateLabel(T('You already have the latest version.', '当前已是最新版本。'), 16, 20, 428, 17)
+	Local $lblVersion = GUICtrlCreateLabel(T('Latest version: ', '最新版本：') & $tag, 16, 52, 428, 17)
+	Local $lblHint = GUICtrlCreateLabel(T('Repository or asset changed? Redefine the configuration.', '仓库或资源文件有变化？可以重新定义配置。'), 16, 92, 428, 17)
+	Local $btnSettings = GUICtrlCreateButton($g_tSettingsButton, 232, 160, 120, 25, $WS_GROUP)
+	Local $btnClose = GUICtrlCreateButton($g_tCloseButton, 364, 160, 80, 25, $WS_GROUP)
 	Local $msg = 0
 
+	GUICtrlSetColor($lblHint, 0x666666)
+	GUICtrlSetTip($btnSettings, T('Open the settings window and check for updates again', '打开设置窗口，保存后重新检查更新'))
 	GUICtrlSetState($btnClose, $GUI_FOCUS)
 	GUISetState(@SW_SHOW, $form)
 	WinActivate($form)
@@ -514,12 +535,32 @@ Func ShowNoUpdate($tag)
 	While True
 		$msg = GUIGetMsg()
 		If $msg <> 0 Then
-			If $msg = $GUI_EVENT_CLOSE Or $msg = $btnClose Then
-				GUIDelete($form)
-				Return
-			EndIf
+			Switch $msg
+				Case $GUI_EVENT_CLOSE, $btnClose
+					GUIDelete($form)
+					Return 'close'
+				Case $btnSettings
+					GUIDelete($form)
+					Return 'settings'
+			EndSwitch
 		EndIf
 	WEnd
+EndFunc
+
+; Opens the settings window, saves the result and restarts the update check.
+; Canceling the settings window ends the run.
+Func RedefineSettings()
+	If Not ShowSettings() Then
+		LogW('Settings canceled')
+		okExit()
+	EndIf
+	SaveSettings()
+	LogW('Configuration redefined, checking again')
+	If $g_restartCount < 3 Then
+		$g_restartCount += 1
+		Main()
+	EndIf
+	okExit()
 EndFunc
 
 Func SaveSettings()
@@ -574,6 +615,7 @@ Func SetLanguage()
 	$g_tYesButton = T('&Yes', '是(&Y)')
 	$g_tNoButton = T('&No', '否(&N)')
 	$g_tCloseButton = T('&Close', '关闭(&C)')
+	$g_tSettingsButton = T('&Settings', '重新定义配置(&S)')
 	$g_tStatusFormTitle = T('GitUpdater Status', 'GitUpdater 状态')
 	$g_tStatusDownloadLabel = T('Downloading', '正在下载')
 	$g_tStatusCompleteLabel = T('Complete', '完成')
@@ -638,6 +680,14 @@ Func GetApiBase($url)
 EndFunc
 
 Func GetProcessName($url)
+	Local $name = GetSoftwareName($url)
+	If $name = '' Then Return ''
+	Return $name & '.exe'
+EndFunc
+
+; Extract the repository name from a GitHub URL, e.g.
+; https://github.com/Zoo-Code-Or/Zoo-Code -> Zoo-Code
+Func GetSoftwareName($url)
 	Local $base = GetApiBase($url)
 	Local $parts = 0
 	Local $repo = ''
@@ -646,8 +696,7 @@ Func GetProcessName($url)
 	$parts = StringSplit($base, '/')
 	If $parts[0] < 1 Then Return ''
 	$repo = $parts[$parts[0]]
-	If $repo = '' Then Return ''
-	Return $repo & '.exe'
+	Return $repo
 EndFunc
 
 Func HttpGet($url)
@@ -968,7 +1017,7 @@ Func DownloadAsset($assetUrl, $assetSize, $tag, $releaseBody)
 		If @error Then $remoteSize = 0
 	EndIf
 
-	$g_statusForm = GUICreate($g_tStatusFormTitle, 520, 440)
+	$g_statusForm = GUICreate($g_tStatusFormTitle & ' - ' & GetSoftwareName($g_softwareUrl), 520, 440)
 	$g_statusDescription = GUICtrlCreateLabel($g_tStatusDownloadLabel & $g_tColon, 8, 8, 110, 17)
 	$versionLabel = GUICtrlCreateLabel($tag, 120, 8, 384, 17)
 	$g_statusCompleteLabel = GUICtrlCreateLabel($g_tStatusCompleteLabel & $g_tColon, 8, 32, 110, 17)

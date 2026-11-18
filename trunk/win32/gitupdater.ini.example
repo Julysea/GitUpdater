@@ -36,6 +36,7 @@ DownloadRetries=2
 [Extract]
 StripRootFolder=yes
 DeleteDownloadedFiles=yes
+BinPath=
 
 [Error]
 SupressInetRead=no

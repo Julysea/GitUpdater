@@ -14,7 +14,7 @@ It reads the latest release from **GitHub Releases**, downloads the specified re
 * Supports `[$ver]` / `[$tag]` version placeholders, suitable for repositories with versioned asset names
 * Reads the first entry of the Releases list, matching the order shown on the GitHub Releases page
 * Compares only the latest tag string: skips if the same, updates if different; no rc/beta semantic version comparison
-* Shows "Already up to date" prompt when no update is needed, waits for user to click "Close"
+* Shows "Already up to date" when no update is needed, with a "Settings" button (saving the configuration immediately re-checks for updates) and a "Close" button
 * Download progress, automatic retry on failure, release notes
 * Confirmation window shows update details; updates only proceed after clicking "Yes"
 * Clicking "No" or closing the window cancels the update
@@ -135,6 +135,7 @@ You can also add `--settings` at startup to reopen the settings window.
 | --- | --- | --- |
 | `StripRootFolder` | `yes` | If the archive has only one top-level folder, automatically moves its contents to the install directory |
 | `DeleteDownloadedFiles` | `yes` | Deletes downloaded files after successful archive extraction; download-only mode keeps the file |
+| `BinPath` | empty | Path inside the archive to extract (relative to archive root). Empty means extract all contents; `BIN` means extract only the `BIN` directory; `foo/bar` means extract the `foo/bar` path |
 
 ### `[Error]`
 
@@ -152,6 +153,7 @@ You can also add `--settings` at startup to reopen the settings window.
 
 * `LastUpdateDate`: Date of the last check/update
 * `LastUpdatedVersion`: Tag of the last update, e.g., `v0.24.0-rc.1`
+* `LastUpdatedRepo`: Repository name that `LastUpdatedVersion` belongs to
 * `LastReleaseUrl`: Release page URL of the last update
 
 ### Removed old configuration keys
@@ -170,6 +172,7 @@ The following configuration keys are now ignored:
 ### New configuration keys
 
 * `DownloadRetries`: Number of retries on download failure, default `2`
+* `BinPath`: Path inside the archive to extract, default empty (extract all contents)
 
 ## Asset File Placeholders
 
@@ -223,9 +226,11 @@ GitUpdater handles files automatically based on the file extension, no extractio
 
 GitUpdater **does not parse version numbers**; it only compares the latest tag string:
 
-* Previous: `v0.24.0-rc.1`, latest: `v0.24.0-rc.1` → skip, shows "Already up to date", waits for "Close"
+* Previous: `v0.24.0-rc.1`, latest: `v0.24.0-rc.1` → skip, shows "Already up to date" with "Settings" and "Close" buttons
 * Previous: `v0.24.0-rc.1`, latest: `v0.24.0-rc.2` → update
 * Previous: `v0.24.0-rc.1`, latest: `v0.24.0` → update
+
+The recorded version is also bound to the repository name: if `SoftwareUrl` is changed to another repository later, the check runs again even when the tag is the same instead of reporting "already up to date".
 
 Use `--force` to ignore the same tag and force re-download.
 
@@ -258,8 +263,10 @@ GitUpdater.exe --force
    * Take the first entry of the Releases list
 8. Read `tag_name`, `body` (release notes), and `assets`.
 9. Replace `[$ver]` / `[$tag]`, match assets by full file name.
-10. Compare the latest tag with `LastUpdatedVersion`:
-    * Same and no `--force` → show "Already up to date", wait for user to click "Close"
+10. Compare the latest tag with `LastUpdatedVersion` (and verify `LastUpdatedRepo` still matches the configured repository):
+    * Same and no `--force` → show "Already up to date":
+        * "Settings" → open the settings window, save, and restart the check
+        * "Close" → exit
     * Same and with `--force` → continue updating
     * Different → continue
 11. If an update is needed and `Update=ask`, show the confirmation window:
@@ -270,9 +277,11 @@ GitUpdater.exe --force
 13. Process the downloaded file based on extension:
     * zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz → auto-extract
     * Other formats → download only
-14. Write `LastUpdatedVersion` / `LastUpdateDate`, clean up downloaded files according to rules.
-15. Show "Update complete" or "Download complete", wait for user to click "Close" before exiting.
-16. **Does not start the updated application.**
+14. Extract the specified path from the archive based on `BinPath` configuration (empty means extract all contents).
+15. Remove old version directories (directories with a different version number).
+16. Write `LastUpdatedVersion` / `LastUpdateDate`, clean up downloaded files according to rules.
+17. Show "Update complete" or "Download complete", wait for user to click "Close" before exiting.
+18. **Does not start the updated application.**
 
 ## Notes
 
