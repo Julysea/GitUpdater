@@ -36,7 +36,19 @@ GitUpdater/
   README_EN.md
   gitupdater.ico            ; Application icon
   trunk/win32/
-    GitUpdater.au3          ; AutoIt source code
+    GitUpdater.au3          ; 入口脚本（全局变量、Main）
+    include/                ; 按功能拆分的模块
+      lang.au3              ; 语言检测与翻译
+      log.au3               ; 日志、错误提示、退出
+      helpers.au3           ; 路径/目录/进程辅助函数
+      config.au3            ; 配置读写（gitupdater.ini）
+      http.au3              ; HTTP 请求（WinHttp）
+      json.au3              ; JSON 读取
+      github.au3            ; GitHub 仓库与 Release 信息
+      assets.au3            ; 资源文件名匹配
+      download.au3          ; 下载与进度窗口
+      archive.au3           ; 解压与文件安装
+      ui.au3                ; 设置/确认/状态窗口
     README.txt
     gitupdater.ini.example  ; Configuration example
 ```
