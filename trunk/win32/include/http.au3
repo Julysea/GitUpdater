@@ -28,6 +28,15 @@ Func HttpGet($url)
 	Return $text
 EndFunc
 
+Func HttpGetWithSettings($url)
+	Local $json = HttpGet($url)
+	If @error Then
+		; Return error code so caller can decide what to do
+		Return SetError(@error, @extended, '')
+	EndIf
+	Return $json
+EndFunc
+
 Func ComErrorHandler()
 	; Swallow COM errors. HttpGet checks the HTTP status explicitly.
 EndFunc

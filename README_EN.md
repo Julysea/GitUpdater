@@ -15,6 +15,7 @@ It reads the latest release from **GitHub Releases**, downloads the specified re
 * Reads the first entry of the Releases list, matching the order shown on the GitHub Releases page
 * Compares only the latest tag string: skips if the same, updates if different; no rc/beta semantic version comparison
 * Shows "Already up to date" when no update is needed, with a "Settings" button (saving the configuration immediately re-checks for updates) and a "Close" button
+* The settings window has only two buttons, "Ok" and "Cancel": "Ok" saves and returns to the previous window; "Cancel" or closing the window discards changes and returns to the previous window. On first run and with `--settings`, both exit the program
 * Download progress, automatic retry on failure, release notes
 * Confirmation window shows update details; updates only proceed after clicking "Yes"
 * Clicking "No" or closing the window cancels the update
@@ -61,7 +62,7 @@ GitUpdater/
    * marktext: marktext's installation directory
 3. Run `GitUpdater.exe`. The first run shows the settings window.
 4. Fill in the **GitHub repository** and **asset file**. Example hints are displayed above the input boxes.
-5. After clicking "Ok", if a new version is found, a confirmation window appears with update details.
+5. After clicking "Ok" to save, if a new version is found, a confirmation window appears with update details. (When the settings window was opened from a prompt via "Settings", "Cancel" returns to that prompt instead of exiting.)
 6. Click "Yes" to start downloading, or "No" / close the window to exit without updating.
 7. After updating, the window shows "Update complete". Click "Close" to exit.
 8. GitUpdater does not start the target program; you need to start it yourself.
@@ -122,7 +123,7 @@ The generated `GitUpdater.exe` is output to the source directory by default.
 ## Configuration
 
 The configuration file is `gitupdater.ini` in the same directory as `GitUpdater.exe`, automatically generated after the first-run settings window.
-You can also add `--settings` at startup to reopen the settings window.
+You can also add `--settings` at startup to reopen the settings window; "Ok" saves and exits, "Cancel" exits without saving.
 
 ### `[General]`
 
@@ -212,7 +213,8 @@ AssetFile=myapp-[$tag].zip
 
 * File name matching is case-insensitive.
 * Must exactly match the asset file name in the GitHub Release (after placeholder replacement).
-* If not filled in or no match is found after replacement, a list of available assets is shown.
+* If not filled in or no match is found after replacement, a list of available assets is shown; when a closest file name is found, a window asks whether to download it.
+* The asset confirmation window offers "Settings" to change the asset name: "Ok" saves and re-checks, "Cancel" returns to that window.
 * No automatic selection; no built-in repository rules.
 * **Note**: `[$ver]` does **not** include the leading `v` after replacement. If the actual asset filename contains a `v` (e.g., `TriliumNotes-v0.107.0-windows-x64.zip`), write it as `TriliumNotes-v[$ver]-windows-x64.zip`; otherwise it resolves to `TriliumNotes-0.107.0-windows-x64.zip` and fails to match.
 
@@ -250,7 +252,7 @@ Use `--force` to ignore the same tag and force re-download.
 
 | Argument | Description |
 | --- | --- |
-| `--settings` | Open the settings window, save and exit |
+| `--settings` | Open the settings window; "Ok" saves and exits, "Cancel" exits without saving |
 | `--force` | Ignore "once per day" and same-tag checks, update directly |
 
 For example:
@@ -263,7 +265,7 @@ GitUpdater.exe --force
 ## Workflow
 
 1. Read `gitupdater.ini`.
-2. If the repository or asset file is empty, show the settings window.
+2. If the repository or asset file is empty (first run), show the settings window: "Ok" saves and continues, "Cancel" or closing exits.
 3. Install directory is fixed to the folder containing `GitUpdater.exe`; check write permission.
 4. Derive process name from the repository name (e.g., `marktext` → `marktext.exe`), check if the target application is running.
    * If the target application is running → prompt user to close it, exit.
@@ -277,7 +279,7 @@ GitUpdater.exe --force
 9. Replace `[$ver]` / `[$tag]`, match assets by full file name.
 10. Compare the latest tag with `LastUpdatedVersion` (and verify `LastUpdatedRepo` still matches the configured repository):
     * Same and no `--force` → show "Already up to date":
-        * "Settings" → open the settings window, save, and restart the check
+        * "Settings" → open the settings window: "Ok" saves and restarts the check; "Cancel" returns to the "Already up to date" window without a new request
         * "Close" → exit
     * Same and with `--force` → continue updating
     * Different → continue
@@ -285,6 +287,7 @@ GitUpdater.exe --force
     * Display repository, current version, available version, and release notes
     * Only proceed after clicking "Yes"
     * Clicking "No" or closing the window exits without downloading
+    * "Settings" → open the settings window: "Ok" saves and re-checks; "Cancel" returns to the confirmation window
 12. Show download progress and download the asset; retry on failure according to `DownloadRetries`.
 13. Process the downloaded file based on extension:
     * zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz → auto-extract

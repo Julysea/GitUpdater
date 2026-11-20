@@ -91,7 +91,6 @@ Global $g_statusCompleteLabel = 0
 Global $g_statusCompleteValue = 0
 Global $g_statusCloseButton = 0
 Global $g_didProcess = False
-Global $g_restartCount = 0
 Global $g_updateApproved = False
 
 ; Translations
@@ -100,7 +99,6 @@ Global $g_tCancelButton = '&Cancel'
 Global $g_tYesButton = '&Yes'
 Global $g_tNoButton = '&No'
 Global $g_tCloseButton = '&Close'
-Global $g_tBackButton = '&Back'
 Global $g_tSettingsButton = '&Settings'
 Global $g_tStatusFormTitle = 'GitUpdater Status'
 Global $g_tStatusDownloadLabel = 'Downloading'
@@ -152,11 +150,10 @@ Func Main()
 	SetLanguage()
 
 	If $firstRun Or $settingsOnly Or $g_softwareUrl = '' Or $g_assetFile = '' Then
-		If Not ShowSettings() Then
+		If ShowSettings() <> 'ok' Then
 			LogW('Settings canceled')
 			Exit
 		EndIf
-		SaveSettings()
 		If $settingsOnly Then
 			LogW('Settings saved, exiting')
 			Exit
@@ -216,8 +213,25 @@ Func Main()
 
 	$json = FetchRelease()
 	If @error Then
-		NetworkError(T('Could not read release information from GitHub:', '无法从 GitHub 获取 Release 信息：') & @CRLF & $g_softwareUrl)
-		okExit()
+		; When there's a network error, open settings window instead of just showing error
+		Local $errCode = @error
+		Local $httpStatus = @extended
+		Local $errorMsg = T('Could not read release information from GitHub:', '无法从 GitHub 获取 Release 信息：') & @CRLF & $g_softwareUrl
+		If $httpStatus > 0 Then
+			$errorMsg &= @CRLF & @CRLF & T('HTTP Status: ', 'HTTP 状态：') & $httpStatus
+		EndIf
+
+		; Show error message
+		MsgBox($MB_ICONERROR, 'GitUpdater', $errorMsg)
+
+		; Open settings window
+		If ShowSettings() <> 'ok' Then
+			LogW('Settings canceled after error')
+			CancelExit()
+		Else
+			LogW('Settings opened after error, exiting')
+			okExit()
+		EndIf
 	EndIf
 
 	$tag = JsonGetString($json, 'tag_name')
@@ -235,7 +249,14 @@ Func Main()
 	If $lastRepo <> '' And $lastRepo <> GetSoftwareName($g_softwareUrl) Then $lastVersion = ''
 	If $lastVersion <> '' And Not $g_force And $lastVersion = $tag Then
 		LogW('Already up to date (same tag): ' & $tag)
-		If ShowNoUpdate($tag) = 'settings' Then RedefineSettings()
+		Local $noUpdateChoice = ShowNoUpdate($tag)
+		While $noUpdateChoice = 'settings'
+			If RedefineSettings() = 'ok' Then
+				Main()
+				okExit()
+			EndIf
+			$noUpdateChoice = ShowNoUpdate($tag)
+		WEnd
 		IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
 		okExit()
 	EndIf
@@ -250,10 +271,15 @@ Func Main()
 			EndIf
 		EndIf
 		Local $confirmResult = ConfirmUpdate($g_softwareUrl, $currentText, $tag, $releaseBody)
-		If $confirmResult = 'settings' Then
+		While $confirmResult = 'settings'
 			LogW('Redefining configuration from update prompt')
-			RedefineSettings()
-		ElseIf $confirmResult = 'yes' Then
+			If RedefineSettings() = 'ok' Then
+				Main()
+				okExit()
+			EndIf
+			$confirmResult = ConfirmUpdate($g_softwareUrl, $currentText, $tag, $releaseBody)
+		WEnd
+		If $confirmResult = 'yes' Then
 			; Continue this run instead of restarting: a restart would load
 			; Update=ask again and show the same prompt in an endless loop.
 			LogW('Update confirmed by user')
@@ -293,10 +319,15 @@ Func Main()
 
 		LogW('No exact asset. Closest match: ' & $assets[$assetIndex][0] & ' (' & Round($nearScore) & '%)')
 		$assetChoice = ConfirmAsset($g_assetFile, $resolvedAsset, $assets[$assetIndex][0], $nearScore, $tag, $releaseBody, $assets)
-		If $assetChoice = 'settings' Then
+		While $assetChoice = 'settings'
 			LogW('Redefining configuration from asset prompt')
-			RedefineSettings()
-		ElseIf $assetChoice <> 'yes' Then
+			If RedefineSettings() = 'ok' Then
+				Main()
+				okExit()
+			EndIf
+			$assetChoice = ConfirmAsset($g_assetFile, $resolvedAsset, $assets[$assetIndex][0], $nearScore, $tag, $releaseBody, $assets)
+		WEnd
+		If $assetChoice <> 'yes' Then
 			LogW('Closest asset declined by user: ' & $assets[$assetIndex][0])
 			IniWrite($g_iniFile, 'General', 'LastUpdateDate', _NowCalcDate())
 			okExit()

@@ -57,7 +57,7 @@ Func FetchRelease()
 	$url = $apiBase & '/releases?per_page=1'
 
 	LogW('GitHub API: ' & $url)
-	$json = HttpGet($url)
+	$json = HttpGetWithSettings($url)
 	$err = @error
 	$ext = @extended
 	If $err Then

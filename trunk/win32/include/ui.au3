@@ -39,7 +39,12 @@ Func WaitForStatusClose()
 	WEnd
 EndFunc
 
-Func ShowSettings($showBack = False)
+; $mode = 'initial'  : first run or --settings. The caller exits on 'cancel'.
+;         'redefine' : opened from a previous window. The caller returns to it
+;                      on 'cancel' and restarts the check on 'ok'.
+; The dialog always has two buttons: 确定 saves and returns 'ok',
+; 取消 / close discards and returns 'cancel'. Values are only applied on 'ok'.
+Func ShowSettings($mode = 'initial')
 	Local $form = GUICreate(T('GitUpdater Settings', 'GitUpdater 设置'), 520, 520)
 	Local $lblSoftware = GUICtrlCreateLabel(T('GitHub repository:', 'GitHub 仓库：'), 8, 10, 496, 17)
 	Local $hintSoftware = GUICtrlCreateLabel(T('Example: https://github.com/anomalyco/opencode', '示例：https://github.com/anomalyco/opencode'), 8, 30, 496, 17)
@@ -61,7 +66,6 @@ Func ShowSettings($showBack = False)
 	Local $edtLog = GUICtrlCreateInput($g_logFile, 8, 404, 496, 21)
 	Local $btnOk = GUICtrlCreateButton($g_tOKButton, 416, 460, 80, 25, $WS_GROUP)
 	Local $btnCancel = GUICtrlCreateButton($g_tCancelButton, 330, 460, 80, 25, $WS_GROUP)
-	Local $btnBack = 0
 	Local $msg = 0
 	Local $updateLabels = ''
 	Local $updateSelection = ''
@@ -92,11 +96,7 @@ Func ShowSettings($showBack = False)
 	If $g_deleteDownloaded = 'yes' Then GUICtrlSetState($chkDelete, $GUI_CHECKED)
 	If $g_stripRoot = 'yes' Then GUICtrlSetState($chkStrip, $GUI_CHECKED)
 
-	If $showBack Then
-		$btnBack = GUICtrlCreateButton($g_tBackButton, 202, 460, 120, 25, $WS_GROUP)
-		GUICtrlSetTip($btnBack, T('Go back to the previous window', '返回上一个窗口'))
-	EndIf
-
+	LogW('Settings opened: ' & $mode)
 	GUISetState(@SW_SHOW, $form)
 	While True
 		$msg = GUIGetMsg()
@@ -104,10 +104,7 @@ Func ShowSettings($showBack = False)
 			Switch $msg
 				Case $GUI_EVENT_CLOSE, $btnCancel
 					GUIDelete($form)
-					Return False
-				Case $btnBack
-					GUIDelete($form)
-					Return 'back'
+					Return 'cancel'
 				Case $btnOk
 					If StringStripWS(GUICtrlRead($edtSoftware), 3) = '' Or StringStripWS(GUICtrlRead($edtAsset), 3) = '' Then
 						MsgBox($MB_ICONWARNING, 'GitUpdater', T('Please enter the GitHub repository and asset file.', '请填写 GitHub 仓库和资源文件。'))
@@ -139,8 +136,10 @@ Func ShowSettings($showBack = False)
 
 	If $g_update = '' Then $g_update = 'ask'
 
+	; 确定 = save and return. The caller decides whether to continue or exit.
+	SaveSettings()
 	GUIDelete($form)
-	Return True
+	Return 'ok'
 EndFunc
 
 Func ConfirmUpdate($repo, $current, $version, $notes)
@@ -251,28 +250,17 @@ Func ShowNoUpdate($tag)
 	WEnd
 EndFunc
 
-; Opens the settings window, saves the result and restarts the update check.
-; Canceling the settings window ends the run.
+; Opens the settings window from a previous window.
+; Returns 'ok' when the values were saved, 'cancel' when they were discarded.
+; The caller decides whether to go back to its window or restart the check.
 Func RedefineSettings()
-	Local $result = ShowSettings(True)
-	If $result = 'back' Then
-		LogW('Settings back, checking again')
-		If $g_restartCount < 3 Then
-			$g_restartCount += 1
-			Main()
-		EndIf
-		okExit()
+	If ShowSettings('redefine') = 'cancel' Then
+		LogW('Settings canceled, returning to the previous window')
+		Return 'cancel'
 	EndIf
-	If Not $result Then
-		LogW('Settings canceled')
-		okExit()
-	EndIf
-	SaveSettings()
-	LogW('Configuration redefined, checking again')
-	If $g_restartCount < 3 Then
-		$g_restartCount += 1
-		Main()
-	EndIf
-	okExit()
+	; The configuration may have changed, so ask again on the next check.
+	$g_updateApproved = False
+	LogW('Configuration saved, returning to the previous window')
+	Return 'ok'
 EndFunc
 
