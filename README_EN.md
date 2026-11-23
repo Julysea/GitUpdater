@@ -26,6 +26,7 @@ It reads the latest release from **GitHub Releases**, downloads the specified re
 * Anonymous GitHub access, no Token required
 * Auto-extracts common archive formats (zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz); other formats are downloaded only
 * Built-in Chinese/English support, no external translation files needed
+* Help button in the settings window opens the help page in the default browser; Chinese and English pages are embedded in the exe, the one matching the Windows UI language is chosen automatically, and it is extracted to the temp folder on first use (a `help_zh.html` / `help_en.html` next to the exe overrides the built-in page)
 * Log file
 * Custom icon
 
@@ -51,6 +52,8 @@ GitUpdater/
       archive.au3           ; Extraction and file installation
       ui.au3                ; Settings, confirmation and status windows
     README.txt
+    help_zh.html            ; Chinese help page source, embedded into the exe (extracted to %TEMP% when shown)
+    help_en.html            ; English help page source, embedded into the exe (chosen by the UI language)
     gitupdater.ini.example  ; Configuration example
 ```
 

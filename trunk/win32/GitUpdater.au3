@@ -100,6 +100,7 @@ Global $g_tYesButton = '&Yes'
 Global $g_tNoButton = '&No'
 Global $g_tCloseButton = '&Close'
 Global $g_tSettingsButton = '&Settings'
+Global $g_tHelpButton = '&Help'
 Global $g_tStatusFormTitle = 'GitUpdater Status'
 Global $g_tStatusDownloadLabel = 'Downloading'
 Global $g_tStatusCompleteLabel = 'Complete'
@@ -114,6 +115,20 @@ Global $g_comError = ObjEvent('AutoIt.Error', 'ComErrorHandler')
 
 Main()
 Exit
+
+; Write the embedded help page to the temp folder and return its path.
+; FileInstall is resolved at compile time relative to this script, so
+; "help_zh.html" / "help_en.html" are in trunk\win32; nothing extra ships
+; next to the exe.
+Func ExtractHelpFile($lang)
+	Local $file = @TempDir & '\GitUpdater_help_' & $lang & '.html'
+	If $lang = 'zh' Then
+		FileInstall('help_zh.html', $file, 1)
+	Else
+		FileInstall('help_en.html', $file, 1)
+	EndIf
+	Return $file
+EndFunc
 
 Func Main()
 	Local $firstRun = Not FileExists($g_iniFile)

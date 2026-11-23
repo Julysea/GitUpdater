@@ -39,6 +39,32 @@ Func WaitForStatusClose()
 	WEnd
 EndFunc
 
+; Open the help page in the default browser. Two pages are embedded in the
+; exe (Chinese and English) and the one matching the UI language is extracted
+; to the temp folder on first use, so no extra file has to ship next to
+; GitUpdater.exe. An external help_<lang>.html or help.html placed next to the
+; exe takes precedence and can be edited freely.
+Func ShowHelp()
+	Local $file = ''
+
+	If FileExists($g_workingDir & 'help_' & $g_lang & '.html') Then
+		$file = $g_workingDir & 'help_' & $g_lang & '.html'
+	ElseIf FileExists($g_workingDir & 'help.html') Then
+		$file = $g_workingDir & 'help.html'
+	EndIf
+
+	If $file = '' Then
+		$file = ExtractHelpFile($g_lang)
+	EndIf
+
+	If Not FileExists($file) Then
+		MsgBox($MB_ICONWARNING, 'GitUpdater', T('Help file not found:', '未找到帮助文件：') & @CRLF & @CRLF & $file)
+		Return
+	EndIf
+	LogW('Opening help: ' & $file)
+	ShellExecute($file)
+EndFunc
+
 ; $mode = 'initial'  : first run or --settings. The caller exits on 'cancel'.
 ;         'redefine' : opened from a previous window. The caller returns to it
 ;                      on 'cancel' and restarts the check on 'ok'.
@@ -66,6 +92,7 @@ Func ShowSettings($mode = 'initial')
 	Local $edtLog = GUICtrlCreateInput($g_logFile, 8, 404, 496, 21)
 	Local $btnOk = GUICtrlCreateButton($g_tOKButton, 416, 460, 80, 25, $WS_GROUP)
 	Local $btnCancel = GUICtrlCreateButton($g_tCancelButton, 330, 460, 80, 25, $WS_GROUP)
+	Local $btnHelp = GUICtrlCreateButton($g_tHelpButton, 8, 460, 80, 25, $WS_GROUP)
 	Local $msg = 0
 	Local $updateLabels = ''
 	Local $updateSelection = ''
@@ -78,6 +105,7 @@ Func ShowSettings($mode = 'initial')
 	GUICtrlSetTip($edtSoftware, T('Repository URL, for example https://github.com/anomalyco/opencode', '仓库地址，例如 https://github.com/anomalyco/opencode'))
 	GUICtrlSetTip($edtAsset, T('Asset file name. Use [$ver] for the latest version without the leading v (e.g. v0.107.0 -> 0.107.0), and [$tag] for the full tag. If the actual filename contains a v (e.g. TriliumNotes-v0.107.0-...), write it as TriliumNotes-v[$ver]-....', '资源文件名。[$ver] 表示最新版本号（去掉开头的 v，如 v0.107.0 -> 0.107.0），[$tag] 表示完整标签。如果实际文件名中包含 v（如 TriliumNotes-v0.107.0-...），需要写成 TriliumNotes-v[$ver]-...。'))
 	GUICtrlSetTip($lblArchiveHint, T('ZIP and TAR formats use Windows built-in tools. 7z/RAR require 7-Zip.', 'zip 和 tar 系列使用 Windows 自带工具；7z/rar 需要安装 7-Zip。'))
+	GUICtrlSetTip($btnHelp, T('Open the help page (help.html) in your browser', '用浏览器打开帮助文件 help.html'))
 
 	$updateLabels = T('yes|ask|no', '是|询问|否')
 	$updateSelection = $g_update
@@ -105,6 +133,8 @@ Func ShowSettings($mode = 'initial')
 				Case $GUI_EVENT_CLOSE, $btnCancel
 					GUIDelete($form)
 					Return 'cancel'
+				Case $btnHelp
+					ShowHelp()
 				Case $btnOk
 					If StringStripWS(GUICtrlRead($edtSoftware), 3) = '' Or StringStripWS(GUICtrlRead($edtAsset), 3) = '' Then
 						MsgBox($MB_ICONWARNING, 'GitUpdater', T('Please enter the GitHub repository and asset file.', '请填写 GitHub 仓库和资源文件。'))

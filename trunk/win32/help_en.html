@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitUpdater Help</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.7;
+         max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; color: #222; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #ddd; background: #1e1e1e; } code, pre { background: #2a2a2a !important; } th { background: #2a2a2a !important; } }
+  h1 { font-size: 26px; border-bottom: 2px solid #3a7bd5; padding-bottom: 8px; }
+  h2 { font-size: 20px; margin-top: 32px; border-left: 4px solid #3a7bd5; padding-left: 8px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f2f5fa; }
+  code { background: #f4f4f4; padding: 1px 4px; border-radius: 3px; font-family: Consolas, monospace; font-size: 13px; }
+  pre { background: #f4f4f4; padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+  .note { background: #fff8e1; border-left: 4px solid #f0b400; padding: 8px 12px; margin: 12px 0; }
+  .tip { background: #eaf3ff; border-left: 4px solid #3a7bd5; padding: 8px 12px; margin: 12px 0; }
+  nav a { margin-right: 14px; }
+</style>
+</head>
+<body>
+
+<h1>GitUpdater Help</h1>
+
+<nav>
+  <a href="#start">Quick start</a>
+  <a href="#settings">Settings</a>
+  <a href="#asset">Asset names</a>
+  <a href="#binpath">Extract path</a>
+  <a href="#archive">Archives</a>
+  <a href="#version">Version check</a>
+  <a href="#cli">Command line</a>
+  <a href="#ini">Config file</a>
+  <a href="#faq">FAQ</a>
+</nav>
+
+<h2 id="start">1. Quick start</h2>
+<ol>
+  <li>Put <code>GitUpdater.exe</code> into the folder of the application you want to update.</li>
+  <li>Run <code>GitUpdater.exe</code>. The settings window appears on first run.</li>
+  <li>Enter the <b>GitHub repository</b> and the <b>asset file</b>, then click OK.</li>
+  <li>When a new version is found, a confirmation window appears. Click Yes to download and extract, No or close the window to skip the update.</li>
+  <li>After the update finishes, the window shows “Update complete”. Click Close to exit.</li>
+</ol>
+<div class="note">GitUpdater only updates files; it <b>never launches</b> the updated application. Close the application before updating, otherwise files may be locked and the update fails.</div>
+
+<h2 id="settings">2. Settings</h2>
+<table>
+  <tr><th>Item</th><th>Description</th></tr>
+  <tr><td>GitHub repository</td><td><b>Required.</b> Repository URL, e.g. <code>https://github.com/anomalyco/opencode</code>. The updater reads the <b>first</b> entry of the Releases list (same order as the GitHub page).</td></tr>
+  <tr><td>Asset file</td><td><b>Required.</b> Name of the release asset to download, identical to the published file name (case-insensitive). Version placeholders are supported, see <a href="#asset">section 3</a>.</td></tr>
+  <tr><td>Update</td><td><code>Yes</code>: update immediately when a new version exists; <code>Ask</code>: show a confirmation window first (default); <code>No</code>: do not check or update, exit immediately.</td></tr>
+  <tr><td>Limit update check to once a day</td><td>When enabled, further runs on the same day exit immediately to avoid extra GitHub requests.</td></tr>
+  <tr><td>Delete downloaded archive after extraction</td><td>Deletes the downloaded file after a successful extraction. Download-only mode (non-archive formats) always keeps the file.</td></tr>
+  <tr><td>Strip a single root folder from the archive</td><td>When the archive contains exactly one top-level folder, its contents are copied directly into the install folder instead of nesting it.</td></tr>
+  <tr><td>Extract path in archive</td><td>Extract only one subfolder of the archive; empty means everything. See <a href="#binpath">section 4</a>.</td></tr>
+  <tr><td>Log file</td><td>Log path, default <code>gitupdater.log</code> (relative to the exe folder). Empty disables logging.</td></tr>
+</table>
+<div class="tip">The Help button in the lower-left corner opens this page in your default browser. The help pages are embedded in <code>GitUpdater.exe</code> (one Chinese, one English, chosen by the Windows UI language) and extracted to the system temp folder on first use, so no extra files appear in the program folder. A <code>help_zh.html</code> / <code>help_en.html</code> placed next to the exe takes precedence for that language.</div>
+
+<h2 id="asset">3. Asset names and version placeholders</h2>
+<p>The <b>asset file</b> is not a regular expression and not a wildcard; only two placeholders are supported:</p>
+<table>
+  <tr><th>Placeholder</th><th>Meaning</th><th>Example (latest tag <code>v0.24.0-rc.1</code>)</th></tr>
+  <tr><td><code>[$ver]</code></td><td>tag without the leading <code>v</code></td><td><code>marktext-win-x64-[$ver].zip</code> → <code>marktext-win-x64-0.24.0-rc.1.zip</code></td></tr>
+  <tr><td><code>[$tag]</code></td><td>full tag</td><td><code>myapp-[$tag].zip</code> → <code>myapp-v0.24.0-rc.1.zip</code></td></tr>
+</table>
+<div class="note">If the real file name contains a <code>v</code> (e.g. <code>TriliumNotes-v0.107.0-windows-x64.zip</code>), write <code>TriliumNotes-v[$ver]-windows-x64.zip</code>; otherwise the resolved name lacks the <code>v</code> and never matches.</div>
+<p>When no exact match exists:</p>
+<ul>
+  <li>The closest asset with the same extension is suggested and you are asked to confirm the download;</li>
+  <li>If nothing is close enough, all available assets are listed and the program exits with an error.</li>
+</ul>
+<p>Both the confirmation and “already up to date” windows offer “Settings”: OK saves and re-checks immediately, Cancel returns to the previous window.</p>
+
+<h2 id="binpath">4. Extract path in archive (BinPath)</h2>
+<p>Enter a subfolder <b>relative to the archive root</b>, e.g. <code>HydraPortable/App/Hydra</code>, to extract only that folder's contents.</p>
+<ul>
+  <li>Both <code>/</code> and <code>\</code> work; leading and trailing slashes are ignored, so <code>HydraPortable\App\Hydra\</code> equals <code>HydraPortable/App/Hydra</code>.</li>
+  <li>Matching is case-insensitive.</li>
+  <li>Empty means extract everything.</li>
+  <li>This is a path <b>inside</b> the archive, not a local disk path.</li>
+</ul>
+<div class="note">If the configured path is not found, the log records <code>[WARN] Configured path not found in archive: ... (extracting all)</code> and everything is extracted instead. Check whether the archive has an additional top-level folder (e.g. the real path is <code>app-1.0/HydraPortable/App/Hydra</code>); include that level in the setting.</div>
+
+<h2 id="archive">5. Supported archive formats</h2>
+<table>
+  <tr><th>Format</th><th>Handling</th></tr>
+  <tr><td><code>.zip</code></td><td>Extracted with PowerShell <code>Expand-Archive</code></td></tr>
+  <tr><td><code>.7z</code> / <code>.rar</code></td><td>Extracted with 7-Zip; if 7-Zip is missing, Windows <code>tar</code> is tried, then the update fails</td></tr>
+  <tr><td><code>.tar</code> / <code>.tar.gz</code> / <code>.tgz</code> / <code>.tar.bz2</code> / <code>.tbz2</code> / <code>.tar.xz</code> / <code>.txz</code></td><td>Extracted with the built-in Windows <code>tar</code></td></tr>
+  <tr><td>Other formats (<code>.exe</code>, <code>.msi</code>, ...)</td><td><b>Downloaded only</b>: not extracted, not executed</td></tr>
+</table>
+<p>Extraction uses the temporary folder <code>&lt;install folder&gt;.gitupdater_tmp</code>, removed afterwards. Old version folders (names like <code>156.0.8078</code>) are cleaned up; the current version folder is kept.</p>
+
+<h2 id="version">6. Version check</h2>
+<p>Versions are not parsed semantically; only the latest tag string is compared with the last installed tag. Same tag means “already up to date”, a different tag triggers an update. The recorded tag is bound to the repository name, so switching repositories re-checks.</p>
+<p>Use <code>--force</code> to ignore the same-tag check and download again.</p>
+
+<h2 id="cli">7. Command line</h2>
+<table>
+  <tr><th>Argument</th><th>Description</th></tr>
+  <tr><td><code>--settings</code></td><td>Open the settings window; OK saves and exits, Cancel exits without saving</td></tr>
+  <tr><td><code>--force</code></td><td>Ignore the once-a-day limit and the same-tag check, update immediately</td></tr>
+</table>
+<pre>GitUpdater.exe --settings
+GitUpdater.exe --force</pre>
+
+<h2 id="ini">8. Config file gitupdater.ini</h2>
+<p>Located next to <code>GitUpdater.exe</code> and created when settings are saved for the first time. In addition to the settings window items, these keys are supported:</p>
+<table>
+  <tr><th>Section / key</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>[General] Update</code></td><td><code>ask</code></td><td><code>yes</code> / <code>ask</code> / <code>no</code></td></tr>
+  <tr><td><code>[General] UpdateOnceADay</code></td><td><code>no</code></td><td>Check at most once a day</td></tr>
+  <tr><td><code>[General] LogFile</code></td><td><code>gitupdater.log</code></td><td>Log path, empty disables logging</td></tr>
+  <tr><td><code>[Internet] SoftwareUrl</code></td><td>empty</td><td>Repository URL</td></tr>
+  <tr><td><code>[Internet] AssetFile</code></td><td>empty</td><td>Asset file name</td></tr>
+  <tr><td><code>[Internet] UserAgent</code></td><td><code>GitUpdater/1.0</code></td><td>User-Agent for GitHub API requests</td></tr>
+  <tr><td><code>[Internet] DownloadRetries</code></td><td><code>2</code></td><td>Retries after a failed download (total attempts = retries + 1)</td></tr>
+  <tr><td><code>[Extract] StripRootFolder</code></td><td><code>yes</code></td><td>Strip a single root folder</td></tr>
+  <tr><td><code>[Extract] DeleteDownloadedFiles</code></td><td><code>yes</code></td><td>Delete the archive after extraction</td></tr>
+  <tr><td><code>[Extract] BinPath</code></td><td>empty</td><td>Extract only the given path from the archive</td></tr>
+  <tr><td><code>[Error] SupressInetRead</code></td><td><code>no</code></td><td><code>yes</code> silences network error dialogs</td></tr>
+</table>
+<p>At runtime <code>LastUpdateDate</code>, <code>LastUpdatedVersion</code>, <code>LastUpdatedRepo</code> and <code>LastReleaseUrl</code> are written and used for version comparison.</p>
+
+<h2 id="faq">9. FAQ</h2>
+<h3>“Could not read release information from GitHub”</h3>
+<p>Check network, proxy and the repository URL; the log records the HTTP status. Anonymous GitHub API access is rate limited, so retry later.</p>
+<h3>“No release asset matched the configured file name”</h3>
+<p>Compare the name with the Releases page. Remember that <code>[$ver]</code> has no leading <code>v</code>, and check case and extension.</p>
+<h3>“is running” / read-only file</h3>
+<p>Close the application being updated first. For read-only files, clear the read-only attribute or run as administrator.</p>
+<h3>Wrong folder layout after updating</h3>
+<p>Adjust “Strip a single root folder” or “Extract path in archive”. Check the log to see which source folder was actually copied.</p>
+<h3>7z / rar extraction fails</h3>
+<p>Install 7-Zip (<code>C:\Program Files\7-Zip\7z.exe</code>) or use a zip asset instead.</p>
+<h3>Where is the log</h3>
+<p>By default <code>gitupdater.log</code> next to the exe; it records every download, extraction, copy and cleanup step.</p>
+
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitUpdater 使用帮助</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; line-height: 1.7;
+         max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; color: #222; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #ddd; background: #1e1e1e; } code, pre { background: #2a2a2a !important; } th { background: #2a2a2a !important; } }
+  h1 { font-size: 26px; border-bottom: 2px solid #3a7bd5; padding-bottom: 8px; }
+  h2 { font-size: 20px; margin-top: 32px; border-left: 4px solid #3a7bd5; padding-left: 8px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f2f5fa; }
+  code { background: #f4f4f4; padding: 1px 4px; border-radius: 3px; font-family: Consolas, monospace; font-size: 13px; }
+  pre { background: #f4f4f4; padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+  .note { background: #fff8e1; border-left: 4px solid #f0b400; padding: 8px 12px; margin: 12px 0; }
+  .tip { background: #eaf3ff; border-left: 4px solid #3a7bd5; padding: 8px 12px; margin: 12px 0; }
+  nav a { margin-right: 14px; }
+</style>
+</head>
+<body>
+
+<h1>GitUpdater 使用帮助</h1>
+
+<nav>
+  <a href="#start">快速开始</a>
+  <a href="#settings">设置项</a>
+  <a href="#asset">资源文件名</a>
+  <a href="#binpath">释放路径</a>
+  <a href="#archive">压缩包处理</a>
+  <a href="#version">版本判断</a>
+  <a href="#cli">命令行参数</a>
+  <a href="#ini">配置文件</a>
+  <a href="#faq">常见问题</a>
+</nav>
+
+<h2 id="start">1. 快速开始</h2>
+<ol>
+  <li>把 <code>GitUpdater.exe</code> 放到要更新的程序目录。</li>
+  <li>运行 <code>GitUpdater.exe</code>，第一次运行会显示设置窗口。</li>
+  <li>填写 <b>GitHub 仓库</b> 和 <b>资源文件</b>，点“确定”。</li>
+  <li>发现新版本时弹出确认窗口，点“是”开始下载与解压；点“否”或关闭窗口则不更新。</li>
+  <li>更新完成后窗口显示“更新完成”，点“关闭”退出。</li>
+</ol>
+<div class="note">GitUpdater 只负责更新，<b>不会启动</b>被更新的程序。更新前请先关闭该程序，否则文件被占用会失败。</div>
+
+<h2 id="settings">2. 设置项说明</h2>
+<table>
+  <tr><th>项目</th><th>说明</th></tr>
+  <tr><td>GitHub 仓库</td><td><b>必填</b>。仓库地址，例如 <code>https://github.com/anomalyco/opencode</code>。程序读取该仓库 Releases 列表的<b>第一条</b>（与 GitHub 页面顺序一致）。</td></tr>
+  <tr><td>资源文件</td><td><b>必填</b>。Release 中要下载的资源文件名，必须与发布页上的文件名一致（不区分大小写）。支持版本占位符，见 <a href="#asset">第 3 节</a>。</td></tr>
+  <tr><td>更新</td><td><code>是</code>：发现新版本直接更新；<code>询问</code>：先弹出确认窗口（默认）；<code>否</code>：不检查、不更新，直接退出。</td></tr>
+  <tr><td>每天只检查一次更新</td><td>勾选后，同一天内重复运行会直接退出，避免频繁请求 GitHub。</td></tr>
+  <tr><td>解压后删除下载的压缩包</td><td>压缩包解压成功后删除下载的文件；只下载模式（非压缩包格式）会保留文件。</td></tr>
+  <tr><td>自动去掉压缩包的单层根目录</td><td>压缩包内只有一个顶层文件夹时，把该文件夹里的内容直接放到安装目录，而不是多套一层目录。</td></tr>
+  <tr><td>指定释放内容路径</td><td>只提取压缩包里某个子目录的内容，留空表示全部提取。见 <a href="#binpath">第 4 节</a>。</td></tr>
+  <tr><td>日志文件</td><td>日志路径，默认 <code>gitupdater.log</code>（相对 exe 所在目录）。留空则关闭日志。</td></tr>
+</table>
+<div class="tip">本窗口左下角的“帮助”按钮会用默认浏览器打开本页。帮助页已内嵌在 <code>GitUpdater.exe</code> 中（中文、英文各一份，按系统界面语言自动选择），首次点击时释放到系统临时目录，不会在程序目录生成任何文件。若在 exe 旁放置 <code>help_zh.html</code> / <code>help_en.html</code>，则优先打开对应语言的外部文件，便于自定义。</div>
+
+<h2 id="asset">3. 资源文件名与版本占位符</h2>
+<p><b>资源文件</b>不是正则表达式，也不是通配符，只支持两个占位符：</p>
+<table>
+  <tr><th>占位符</th><th>含义</th><th>示例（最新 tag 为 <code>v0.24.0-rc.1</code>）</th></tr>
+  <tr><td><code>[$ver]</code></td><td>tag 去掉开头的 <code>v</code></td><td><code>marktext-win-x64-[$ver].zip</code> → <code>marktext-win-x64-0.24.0-rc.1.zip</code></td></tr>
+  <tr><td><code>[$tag]</code></td><td>完整 tag</td><td><code>myapp-[$tag].zip</code> → <code>myapp-v0.24.0-rc.1.zip</code></td></tr>
+</table>
+<div class="note">若实际文件名中包含 <code>v</code>（例如 <code>TriliumNotes-v0.107.0-windows-x64.zip</code>），要写成 <code>TriliumNotes-v[$ver]-windows-x64.zip</code>，否则替换结果缺少 <code>v</code>，会导致匹配失败。</div>
+<p>如果找不到完全一致的资源名：</p>
+<ul>
+  <li>会尝试找名字最接近的同类文件（扩展名需相同），并弹窗让你确认是否下载；</li>
+  <li>差距过大时，直接列出全部可用资源并报错退出。</li>
+</ul>
+<p>确认/无更新窗口中都可以点“重新定义配置”回到设置窗口：点“确定”保存后立即重新检查，“取消”则回到原窗口。</p>
+
+<h2 id="binpath">4. 指定释放内容路径（BinPath）</h2>
+<p>填写压缩包内<b>相对于压缩包根目录</b>的子目录，例如 <code>HydraPortable/App/Hydra</code>，表示只提取该目录下的内容。</p>
+<ul>
+  <li>分隔符 <code>/</code> 和 <code>\</code> 都可以；首尾斜杠会被忽略，<code>HydraPortable\App\Hydra\</code> 等同于 <code>HydraPortable/App/Hydra</code>。</li>
+  <li>大小写不敏感。</li>
+  <li>留空 = 提取全部内容。</li>
+  <li>该路径是压缩包<b>内部</b>的路径，不是本机磁盘路径。</li>
+</ul>
+<div class="note">找不到配置的路径时，程序会在日志中记录 <code>[WARN] Configured path not found in archive: ... (extracting all)</code>，然后按“全部提取”处理。此时先确认包内是否还有一层顶层目录（例如实际是 <code>app-1.0/HydraPortable/App/Hydra</code>），正确写法要带上这一层。</div>
+
+<h2 id="archive">5. 支持的压缩包格式</h2>
+<table>
+  <tr><th>格式</th><th>处理方式</th></tr>
+  <tr><td><code>.zip</code></td><td>用 PowerShell <code>Expand-Archive</code> 解压</td></tr>
+  <tr><td><code>.7z</code> / <code>.rar</code></td><td>调用 7-Zip；找不到 7-Zip 时尝试 Windows 自带 <code>tar</code>，仍失败则报错</td></tr>
+  <tr><td><code>.tar</code> / <code>.tar.gz</code> / <code>.tgz</code> / <code>.tar.bz2</code> / <code>.tbz2</code> / <code>.tar.xz</code> / <code>.txz</code></td><td>用 Windows 自带 <code>tar</code> 解压</td></tr>
+  <tr><td>其他格式（<code>.exe</code>、<code>.msi</code> 等）</td><td><b>只下载</b>，不解压、不运行</td></tr>
+</table>
+<p>解压过程使用临时目录 <code>&lt;安装目录&gt;.gitupdater_tmp</code>，完成后删除。安装后还会清理名字形如版本号的旧版本目录（例如 <code>156.0.8078</code>），当前版本目录保留。</p>
+
+<h2 id="version">6. 版本判断</h2>
+<p>不解析语义版本，只比较最新 tag 字符串：与上次记录相同则跳过（显示“当前已是最新版本”），不同则更新。该记录同时绑定仓库名，换仓库后会重新检查。</p>
+<p>使用 <code>--force</code> 可以忽略相同 tag 的判断，强制重新下载。</p>
+
+<h2 id="cli">7. 命令行参数</h2>
+<table>
+  <tr><th>参数</th><th>说明</th></tr>
+  <tr><td><code>--settings</code></td><td>打开设置窗口；点“确定”保存后退出，点“取消”不保存并退出</td></tr>
+  <tr><td><code>--force</code></td><td>忽略“每天只检查一次”和相同 tag 判断，直接更新</td></tr>
+</table>
+<pre>GitUpdater.exe --settings
+GitUpdater.exe --force</pre>
+
+<h2 id="ini">8. 配置文件 gitupdater.ini</h2>
+<p>与 <code>GitUpdater.exe</code> 同目录，第一次保存设置时自动生成。除设置窗口里的项目外，还支持以下键：</p>
+<table>
+  <tr><th>节 / 键</th><th>默认值</th><th>说明</th></tr>
+  <tr><td><code>[General] Update</code></td><td><code>ask</code></td><td><code>yes</code> / <code>ask</code> / <code>no</code></td></tr>
+  <tr><td><code>[General] UpdateOnceADay</code></td><td><code>no</code></td><td>每天只检查一次</td></tr>
+  <tr><td><code>[General] LogFile</code></td><td><code>gitupdater.log</code></td><td>日志路径，留空关闭日志</td></tr>
+  <tr><td><code>[Internet] SoftwareUrl</code></td><td>空</td><td>仓库地址</td></tr>
+  <tr><td><code>[Internet] AssetFile</code></td><td>空</td><td>资源文件名</td></tr>
+  <tr><td><code>[Internet] UserAgent</code></td><td><code>GitUpdater/1.0</code></td><td>GitHub API 请求的 User-Agent</td></tr>
+  <tr><td><code>[Internet] DownloadRetries</code></td><td><code>2</code></td><td>下载失败重试次数（总尝试次数 = 重试次数 + 1）</td></tr>
+  <tr><td><code>[Extract] StripRootFolder</code></td><td><code>yes</code></td><td>去掉单层根目录</td></tr>
+  <tr><td><code>[Extract] DeleteDownloadedFiles</code></td><td><code>yes</code></td><td>解压后删除压缩包</td></tr>
+  <tr><td><code>[Extract] BinPath</code></td><td>空</td><td>只提取压缩包内的指定路径</td></tr>
+  <tr><td><code>[Error] SupressInetRead</code></td><td><code>no</code></td><td><code>yes</code> 时静默网络错误</td></tr>
+</table>
+<p>运行时还会写入 <code>LastUpdateDate</code>、<code>LastUpdatedVersion</code>、<code>LastUpdatedRepo</code>、<code>LastReleaseUrl</code>，用于版本比较。</p>
+
+<h2 id="faq">9. 常见问题</h2>
+<h3>提示“无法从 GitHub 获取 Release 信息”</h3>
+<p>检查网络、代理，以及仓库地址是否正确；日志中会记录 HTTP 状态码。GitHub API 匿名访问有频率限制，稍后重试即可。</p>
+<h3>提示“没有找到匹配的资源文件”</h3>
+<p>对照 Releases 页面核对文件名，注意 <code>[$ver]</code> 不含开头的 <code>v</code>、大小写与扩展名是否一致。</p>
+<h3>提示目标程序正在运行 / 文件只读</h3>
+<p>先关闭被更新的程序；只读文件需要去掉只读属性或以管理员身份运行。</p>
+<h3>更新后目录结构不对</h3>
+<p>调整“自动去掉压缩包的单层根目录”或“指定释放内容路径”，可先查看日志确认实际提取的源目录。</p>
+<h3>7z / rar 解压失败</h3>
+<p>安装 7-Zip（<code>C:\Program Files\7-Zip\7z.exe</code>），或改用 zip 资源。</p>
+<h3>日志在哪里</h3>
+<p>默认在 exe 同目录的 <code>gitupdater.log</code>，记录了每次执行的下载、解压、复制与清理过程。</p>
+
+</body>
+</html>

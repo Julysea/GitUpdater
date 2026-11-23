@@ -26,6 +26,7 @@ GitUpdater 是一个受 [DCUpdater](../dcupdater) 启发的 Windows GitHub Relea
 * 匿名访问 GitHub，不需要 Token
 * 自动解压常用压缩包（zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz）；其他格式只下载，不处理
 * 中文/英文内置，不需要外部翻译文件
+* 设置窗口带“帮助”按钮，用默认浏览器打开帮助页；中英文帮助页编译时内嵌在 exe 内，按系统界面语言自动选择，首次使用时释放到临时目录，不额外产生文件（exe 旁放 `help_zh.html` / `help_en.html` 可覆盖内置版本）
 * 日志文件
 * 自定义图标
 
@@ -51,6 +52,8 @@ GitUpdater/
       archive.au3           ; 解压与文件安装
       ui.au3                ; 设置/确认/状态窗口
     README.txt
+    help_zh.html            ; 中文帮助页源码，编译时内嵌进 exe（显示时释放到 %TEMP%）
+    help_en.html            ; 英文帮助页源码，编译时内嵌进 exe（按系统界面语言选择）
     gitupdater.ini.example  ; Configuration example
 ```
 
