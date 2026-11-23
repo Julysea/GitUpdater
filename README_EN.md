@@ -148,7 +148,7 @@ You can also add `--settings` at startup to reopen the settings window; "Ok" sav
 | --- | --- | --- |
 | `StripRootFolder` | `yes` | If the archive has only one top-level folder, automatically moves its contents to the install directory |
 | `DeleteDownloadedFiles` | `yes` | Deletes downloaded files after successful archive extraction; download-only mode keeps the file |
-| `BinPath` | empty | Path inside the archive to extract (relative to archive root). Empty means extract all contents; `BIN` means extract only the `BIN` directory; `foo/bar` means extract the `foo/bar` path |
+| `BinPath` | empty | Path inside the archive to extract (relative to archive root). Empty means extract all contents; `BIN` means extract only the `BIN` directory; `foo/bar` means extract the `foo/bar` path. Both `/` and `\` work as separators and leading/trailing slashes are ignored (`foo\bar\` is the same as `foo/bar`) |
 
 ### `[Error]`
 

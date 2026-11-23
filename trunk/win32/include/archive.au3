@@ -81,6 +81,8 @@ Func ProcessDownload($archive, $destDir, $newTag)
 		If $binDir <> '' Then
 			$srcDir = $binDir
 			LogW('Using configured path: ' & $binDir)
+		Else
+			LogW('[WARN] Configured path not found in archive: ' & $g_binPath & ' (extracting all)')
 		EndIf
 	EndIf
 	If $binDir = '' Then
@@ -112,16 +114,36 @@ EndFunc
 
 ; Find the directory at the given path (case-insensitive) inside $dir.
 ; Supports single-level paths like "BIN" or nested paths like "foo/bar".
+; Windows separators and leading/trailing slashes are accepted as well:
+; "foo\bar\", "\foo/bar" and "/foo//bar/" all mean "foo/bar".
 Func FindPathInArchive($dir, $path)
-	Local $parts = StringSplit($path, '/')
+	Local $parts = 0
 	Local $current = $dir
 	Local $i = 0
 
-	For $i = 1 To $parts[0]
+	$path = NormalizeArchivePath($path)
+	If $path = '' Then Return ''
+
+	$parts = StringSplit($path, '/', 2)
+	For $i = 0 To UBound($parts) - 1
+		If $parts[$i] = '' Or $parts[$i] = '.' Then ContinueLoop
 		$current = FindChildDir($current, $parts[$i])
 		If $current = '' Then Return ''
 	Next
 	Return $current
+EndFunc
+
+; Normalize a user-supplied archive path: trim spaces, treat "\" as "/",
+; collapse duplicate separators and drop leading/trailing ones.
+Func NormalizeArchivePath($path)
+	$path = StringStripWS($path, 3)
+	$path = StringReplace($path, '\', '/')
+	While StringInStr($path, '//') > 0
+		$path = StringReplace($path, '//', '/')
+	WEnd
+	$path = StringRegExpReplace($path, '^/+', '')
+	$path = StringRegExpReplace($path, '/+$', '')
+	Return $path
 EndFunc
 
 ; Find a child directory named $name (case-insensitive) under $parent.
