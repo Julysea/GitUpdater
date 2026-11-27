@@ -139,6 +139,94 @@ Func ExtractJsonArray($json, $key)
 	Return ''
 EndFunc
 
+; Release notes are stored under "body" on GitHub/Gitea and under
+; "description" on GitLab.
+Func ReleaseBody($json)
+	Local $body = JsonGetString($json, 'body')
+	If $body <> '' Then Return $body
+	Return JsonGetString($json, 'description')
+EndFunc
+
+; Assets of a GitLab release live in assets.links (name + direct_asset_url).
+Func ParseGitLabAssets($json)
+	Local $result[0][3]
+	Local $arr = ExtractJsonArray($json, 'links')
+	Local $names = 0
+	Local $urls = 0
+	Local $i = 0
+	If $arr = '' Then Return $result
+
+	$names = StringRegExp($arr, '"name"\s*:\s*"((?:\\.|[^"\\])*)"', $STR_REGEXPARRAYGLOBALMATCH)
+	If @error Then Return $result
+	$urls = StringRegExp($arr, '"direct_asset_url"\s*:\s*"((?:\\.|[^"\\])*)"', $STR_REGEXPARRAYGLOBALMATCH)
+	If @error Then
+		$urls = StringRegExp($arr, '"url"\s*:\s*"((?:\\.|[^"\\])*)"', $STR_REGEXPARRAYGLOBALMATCH)
+		If @error Then Return $result
+	EndIf
+
+	For $i = 0 To UBound($names) - 1
+		If $i >= UBound($urls) Then ExitLoop
+		ReDim $result[UBound($result) + 1][3]
+		$result[UBound($result) - 1][0] = JsonUnescape($names[$i])
+		$result[UBound($result) - 1][1] = JsonUnescape($urls[$i])
+		$result[UBound($result) - 1][2] = 0
+	Next
+	Return $result
+EndFunc
+
+; Some projects attach no files to the release and link them from the release
+; notes instead (nightly builders do this). Collect those links so the
+; configured asset name can still be matched.
+Func ParseBodyLinkAssets($body)
+	Local $result[0][3]
+	Local $urls = 0
+	Local $seen = '|'
+	Local $u = ''
+	Local $name = ''
+	Local $ext = ''
+	Local $i = 0
+	If $body = '' Then Return $result
+
+	$urls = StringRegExp($body, 'https?://[^\s"<>]+', $STR_REGEXPARRAYGLOBALMATCH)
+	If @error Then Return $result
+
+	For $i = 0 To UBound($urls) - 1
+		; Strip punctuation that follows a bare URL in markdown or HTML.
+		$u = StringRegExpReplace($urls[$i], '[).,;:!\]}]+$', '')
+		If $u = '' Then ContinueLoop
+		If StringInStr($seen, '|' & $u & '|') Then ContinueLoop
+		$seen &= $u & '|'
+
+		$name = StringRegExpReplace($u, '^.*/', '')
+		$name = StringRegExpReplace($name, '\?.*$', '')
+		$ext = GetFileExt($name)
+		If Not StringRegExp($ext, '^[a-z0-9]{1,8}$') Then ContinueLoop
+		If StringRegExp($ext, '^(html?|php|md|txt|json|xml)$') Then ContinueLoop
+
+		ReDim $result[UBound($result) + 1][3]
+		$result[UBound($result) - 1][0] = $name
+		$result[UBound($result) - 1][1] = $u
+		$result[UBound($result) - 1][2] = 0
+	Next
+	Return $result
+EndFunc
+
+; Assets of the current release, using the parser that matches the host.
+Func ParseReleaseAssets($json)
+	Local $assets = 0
+	If $g_repoProvider = 'gitlab' Then
+		$assets = ParseGitLabAssets($json)
+	Else
+		$assets = ParseAssets($json)
+	EndIf
+
+	If UBound($assets) = 0 Then
+		$assets = ParseBodyLinkAssets(ReleaseBody($json))
+		If UBound($assets) > 0 Then LogW('No attached assets, using links from the release notes')
+	EndIf
+	Return $assets
+EndFunc
+
 Func ParseAssets($json)
 	Local $result[0][3]
 	Local $arr = ExtractJsonArray($json, 'assets')

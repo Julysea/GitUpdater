@@ -14,12 +14,18 @@ Func HttpGet($url)
 	$oHttp.Open('GET', $url, False)
 	$oHttp.SetTimeouts(0, 30000, 30000, 60000)
 	$oHttp.SetRequestHeader('User-Agent', $g_userAgent)
-	$oHttp.SetRequestHeader('Accept', 'application/vnd.github+json')
-	If $g_apiToken <> '' Then $oHttp.SetRequestHeader('Authorization', 'Bearer ' & $g_apiToken)
+	; The API token is a GitHub token, so never send it to other hosts.
+	If IsGithubHost(UrlHost($url)) Then
+		$oHttp.SetRequestHeader('Accept', 'application/vnd.github+json')
+		If $g_apiToken <> '' Then $oHttp.SetRequestHeader('Authorization', 'Bearer ' & $g_apiToken)
+	Else
+		$oHttp.SetRequestHeader('Accept', 'application/json, */*')
+	EndIf
 	$oHttp.Send()
 
 	$status = $oHttp.Status
 	$text = $oHttp.ResponseText
+	$g_lastHttpStatus = $status
 	If $status < 200 Or $status >= 300 Then
 		LogW('[ERROR] HTTP ' & $status & ': ' & $url)
 		If $text <> '' Then LogW('HTTP response: ' & StringLeft($text, 1000))

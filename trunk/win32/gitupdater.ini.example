@@ -9,6 +9,12 @@
 ;   SoftwareUrl=https://github.com/marktext/marktext
 ;   AssetFile=marktext-win-x64-[$ver].zip
 ;
+;   SoftwareUrl=https://git.eden-emu.dev/eden-ci/nightly/releases
+;   AssetFile=Eden-Windows-[$ver]-rog-ally-clang-pgo.zip
+;
+; GitHub, Gitea/Forgejo and GitLab are supported. The host is detected from
+; the URL, so a /releases page URL can be pasted as is.
+;
 ; [$ver] = latest tag without the leading v (v0.24.0-rc.1 -> 0.24.0-rc.1)
 ; [$tag] = full latest tag (v0.24.0-rc.1)
 ;

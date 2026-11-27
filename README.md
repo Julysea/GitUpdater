@@ -1,8 +1,8 @@
 # GitUpdater
 
-GitUpdater 是一个受 [DCUpdater](../dcupdater) 启发的 Windows GitHub Releases 更新器。
+GitUpdater 是一个受 [DCUpdater](../dcupdater) 启发的 Windows Releases 更新器，支持 GitHub、Gitea/Forgejo（含 Codeberg、自建实例）和 GitLab。
 
-它从 **GitHub Releases** 读取最新一条发布，下载用户指定的发布资源，按需解压到 `GitUpdater.exe` 所在目录，显示下载进度、更新说明和完成状态。
+它从发布站点的 **Releases** 读取最新一条发布，下载用户指定的发布资源，按需解压到 `GitUpdater.exe` 所在目录，显示下载进度、更新说明和完成状态。发布站点按填写的网址自动识别，也可以直接粘贴 Releases 页面地址。
 
 **GitUpdater 只负责更新，不负责启动软件。** 更新完成后不会自动启动目标程序。
 
@@ -10,9 +10,10 @@ GitUpdater 是一个受 [DCUpdater](../dcupdater) 启发的 Windows GitHub Relea
 
 * 不内置任何仓库规则
 * 设置窗口的仓库和资源文件默认都为空，只在输入框上方显示示例提示
-* 用户自己填写 GitHub 仓库地址和资源文件名
+* 用户自己填写仓库地址（GitHub / Gitea / GitLab）和资源文件名
 * 支持 `[$ver]` / `[$tag]` 版本占位符，适合资源名带版本号的仓库
-* 读取 Releases 列表第一条，和 GitHub 页面上的 Releases 顺序一致
+* 读取 Releases 列表第一条，和发布页面上的 Releases 顺序一致
+* Release 没有附带资源、只在更新说明里给出下载链接时，自动使用说明中的链接
 * 只比较最新 tag 字符串：相同就跳过，不同就更新；不做 rc/beta 语义版本比较
 * 不需要更新时显示"当前已是最新版本"提示，提供"重新定义配置"按钮（改完配置会立即重新检查更新），或点击"关闭"退出
 * 设置窗口只有"确定"和"取消"两个按钮：点"确定"保存并返回上一层，点"取消"或关闭窗口不保存并返回上一层；首次运行和 `--settings` 下，两者都直接退出程序
@@ -23,7 +24,7 @@ GitUpdater 是一个受 [DCUpdater](../dcupdater) 启发的 Windows GitHub Relea
 * 不自动启动被更新的软件
 * 安装目录固定为 `GitUpdater.exe` 所在目录
 * 进程检查使用仓库名 + `.exe`（例如 `opencode.exe`、`marktext.exe`）
-* 匿名访问 GitHub，不需要 Token
+* 匿名访问 GitHub，不需要 Token（Token 只会发送给 GitHub 主机）
 * 自动解压常用压缩包（zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz）；其他格式只下载，不处理
 * 中文/英文内置，不需要外部翻译文件
 * 设置窗口带“帮助”按钮，用默认浏览器打开帮助页；中英文帮助页编译时内嵌在 exe 内，按系统界面语言自动选择，首次使用时释放到临时目录，不额外产生文件（exe 旁放 `help_zh.html` / `help_en.html` 可覆盖内置版本）
@@ -46,7 +47,7 @@ GitUpdater/
       config.au3            ; 配置读写（gitupdater.ini）
       http.au3              ; HTTP 请求（WinHttp）
       json.au3              ; JSON 读取
-      github.au3            ; GitHub 仓库与 Release 信息
+      gitsource.au3         ; 仓库地址解析、平台识别与 Release 信息
       assets.au3            ; 资源文件名匹配
       download.au3          ; 下载与进度窗口
       archive.au3           ; 解压与文件安装
@@ -64,7 +65,7 @@ GitUpdater/
    * opencode：`D:\Apps\opencode\`
    * marktext：marktext 的安装目录
 3. 运行 `GitUpdater.exe`。第一次运行会显示设置窗口。
-4. 填写 **GitHub 仓库** 和 **资源文件**。输入框上方有示例提示。
+4. 填写 **仓库地址** 和 **资源文件**。输入框上方有示例提示。
 5. 点"确定"保存后，如果发现新版本，会弹出确认窗口并显示更新内容。（从提示窗口点"重新定义配置"进入设置时，点"取消"会回到原来的窗口，不会退出程序。）
 6. 点"是"开始下载，点"否"或关闭窗口则直接退出，不会更新。
 7. 更新完成后窗口显示"更新完成"，点"关闭"退出。
@@ -77,7 +78,7 @@ GitUpdater/
 ### opencode
 
 ```text
-GitHub 仓库:
+仓库地址:
 https://github.com/anomalyco/opencode
 
 资源文件:
@@ -95,7 +96,7 @@ marktext-win-x64-0.24.0-rc.1.zip
 使用 `[$ver]` 占位符：
 
 ```text
-GitHub 仓库:
+仓库地址:
 https://github.com/marktext/marktext
 
 资源文件:
@@ -140,9 +141,9 @@ marktext-win-x64-0.24.0-rc.1.zip
 
 | 键 | 默认值 | 说明 |
 | --- | --- | --- |
-| `SoftwareUrl` | 空 | **必填**，软件 GitHub 仓库地址 |
+| `SoftwareUrl` | 空 | **必填**，软件仓库地址（GitHub / Gitea / GitLab，可含 `/releases` 后缀） |
 | `AssetFile` | 空 | **必填**，发布资源文件名；支持 `[$ver]` / `[$tag]` 占位符 |
-| `UserAgent` | `GitUpdater/1.0` | GitHub API 请求的 User-Agent |
+| `UserAgent` | `GitUpdater/1.0` | 发布站点 API 请求的 User-Agent |
 | `DownloadRetries` | `2` | 下载失败后的重试次数（总尝试次数 = 重试次数 + 1） |
 
 ### `[Extract]`
@@ -182,7 +183,7 @@ marktext-win-x64-0.24.0-rc.1.zip
 * `ExtractCommand`：改为按压缩包格式自动解压
 * `ReleaseTag`：固定读取 Releases 第一条
 * `AssetPattern`：改为 `AssetFile`，支持 `[$ver]` / `[$tag]`
-* `ApiToken`：匿名访问 GitHub
+* `ApiToken`：匿名访问 GitHub（只发送给 GitHub 主机）
 * `TranslationFile`：中英文已内置
 
 ### 新增配置
@@ -215,7 +216,7 @@ AssetFile=myapp-[$tag].zip
 ```
 
 * 文件名不区分大小写。
-* 必须和 GitHub Release 里的资源文件名完全一致（占位符替换后）。
+* 必须和 Release 里的资源文件名完全一致（占位符替换后）。
 * 不填写或填写后没有匹配项时，会显示可用资源列表；如果找到最接近的文件名，会弹窗确认是否下载。
 * 资源确认窗口可以点"重新定义配置"回去修改文件名：点"确定"保存后重新检查，点"取消"返回该窗口。
 * 不做自动选择，不内置任何仓库规则。
@@ -275,10 +276,12 @@ GitUpdater.exe --force
    * 如果目标文件是只读的 → 提示用户，退出。
 5. 如果 `Update` 不是 `yes` / `ask`，直接退出。
 6. 如果启用了"每天只检查一次"，并且今天已经检查过，直接退出。
-7. 调用 GitHub API：
-   * `GET /repos/{owner}/{repo}/releases?per_page=1`
+7. 按网址识别发布平台，调用对应 API：
+   * GitHub：`GET https://api.github.com/repos/{owner}/{repo}/releases?per_page=1`
+   * Gitea/Forgejo：`GET {站点}/api/v1/repos/{owner}/{repo}/releases?limit=1`
+   * GitLab：`GET {站点}/api/v4/projects/{group%2Frepo}/releases?per_page=1`
    * 取 Releases 列表第一条
-8. 读取 `tag_name`、`body`（更新说明）和 `assets`。
+8. 读取 `tag_name`、更新说明（`body`，GitLab 为 `description`）和 `assets`；没有附件时改用更新说明里的下载链接。
 9. 替换 `[$ver]` / `[$tag]`，按完整文件名匹配资源。
 10. 比较最新 tag 与 `LastUpdatedVersion`（并校验 `LastUpdatedRepo` 是否仍是当前仓库）：
     * 相同且没有 `--force` → 显示"当前已是最新版本"：
@@ -310,7 +313,7 @@ GitUpdater.exe --force
 * 不做语义版本比较，只比较 tag 字符串。
 * 非压缩包格式只下载，文件会保留。
 * 7z/rar 解压需要安装 7-Zip；zip 和 tar 系列使用 Windows 自带工具。
-* GitHub 未认证 API 限额约为每小时 60 次；不需要 Token。
+* GitHub 未认证 API 限额约为每小时 60 次；不需要 Token。`ApiToken` 只发送给 GitHub 主机，不会发给其他站点。
 * 如果安装在 `Program Files` 等受保护目录，可能需要以管理员身份运行。
 * 界面语言根据 Windows 显示语言自动选择，没有外部翻译文件。
 * 中文源码必须保存为 UTF-8 with BOM。

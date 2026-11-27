@@ -72,7 +72,7 @@ EndFunc
 ; 取消 / close discards and returns 'cancel'. Values are only applied on 'ok'.
 Func ShowSettings($mode = 'initial')
 	Local $form = GUICreate(T('GitUpdater Settings', 'GitUpdater 设置'), 520, 520)
-	Local $lblSoftware = GUICtrlCreateLabel(T('GitHub repository:', 'GitHub 仓库：'), 8, 10, 496, 17)
+	Local $lblSoftware = GUICtrlCreateLabel(T('Repository URL:', '仓库地址：'), 8, 10, 496, 17)
 	Local $hintSoftware = GUICtrlCreateLabel(T('Example: https://github.com/anomalyco/opencode', '示例：https://github.com/anomalyco/opencode'), 8, 30, 496, 17)
 	Local $edtSoftware = GUICtrlCreateInput($g_softwareUrl, 8, 50, 496, 21)
 	Local $lblAsset = GUICtrlCreateLabel(T('Asset file:', '资源文件：'), 8, 82, 496, 17)
@@ -102,7 +102,7 @@ Func ShowSettings($mode = 'initial')
 	GUICtrlSetColor($hintAsset2, 0x666666)
 	GUICtrlSetColor($lblArchiveFormats, 0x666666)
 
-	GUICtrlSetTip($edtSoftware, T('Repository URL, for example https://github.com/anomalyco/opencode', '仓库地址，例如 https://github.com/anomalyco/opencode'))
+	GUICtrlSetTip($edtSoftware, T('Repository URL: GitHub, Gitea/Forgejo (e.g. https://git.example.com/owner/repo) or GitLab. A Releases page URL works too.', '仓库地址：支持 GitHub、Gitea/Forgejo（如 https://git.example.com/owner/repo）和 GitLab；也可以直接粘贴 Releases 页面地址。'))
 	GUICtrlSetTip($edtAsset, T('Asset file name. Use [$ver] for the latest version without the leading v (e.g. v0.107.0 -> 0.107.0), and [$tag] for the full tag. If the actual filename contains a v (e.g. TriliumNotes-v0.107.0-...), write it as TriliumNotes-v[$ver]-....', '资源文件名。[$ver] 表示最新版本号（去掉开头的 v，如 v0.107.0 -> 0.107.0），[$tag] 表示完整标签。如果实际文件名中包含 v（如 TriliumNotes-v0.107.0-...），需要写成 TriliumNotes-v[$ver]-...。'))
 	GUICtrlSetTip($lblArchiveHint, T('ZIP and TAR formats use Windows built-in tools. 7z/RAR require 7-Zip.', 'zip 和 tar 系列使用 Windows 自带工具；7z/rar 需要安装 7-Zip。'))
 	GUICtrlSetTip($btnHelp, T('Open the help page (help.html) in your browser', '用浏览器打开帮助文件 help.html'))
@@ -137,7 +137,7 @@ Func ShowSettings($mode = 'initial')
 					ShowHelp()
 				Case $btnOk
 					If StringStripWS(GUICtrlRead($edtSoftware), 3) = '' Or StringStripWS(GUICtrlRead($edtAsset), 3) = '' Then
-						MsgBox($MB_ICONWARNING, 'GitUpdater', T('Please enter the GitHub repository and asset file.', '请填写 GitHub 仓库和资源文件。'))
+						MsgBox($MB_ICONWARNING, 'GitUpdater', T('Please enter the repository URL and asset file.', '请填写仓库地址和资源文件。'))
 					Else
 						ExitLoop
 					EndIf

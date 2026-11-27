@@ -1,8 +1,8 @@
 ﻿#Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Outfile_x64=GitUpdater.exe
 #AutoIt3Wrapper_icon=..\..\gitupdater.ico
-#AutoIt3Wrapper_Res_Comment=GitHub Release Updater
-#AutoIt3Wrapper_Res_Description=Downloads and installs the latest release from a GitHub repository
+#AutoIt3Wrapper_Res_Comment=Release Updater
+#AutoIt3Wrapper_Res_Description=Downloads and installs the latest release from a GitHub, Gitea or GitLab repository
 #AutoIt3Wrapper_Res_Fileversion=1.0.0.0
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -10,13 +10,16 @@
 ; GitUpdater
 ;
 ; A small updater inspired by DCUpdater. It reads the newest release from a
-; GitHub repository, downloads the release asset with the configured file
-; name, extracts it into the folder containing GitUpdater.exe, shows progress
-; and release notes, and waits for the user to close the completion window.
-; It does not start the updated application.
+; GitHub, Gitea/Forgejo or GitLab repository, downloads the release asset with
+; the configured file name, extracts it into the folder containing
+; GitUpdater.exe, shows progress and release notes, and waits for the user to
+; close the completion window. It does not start the updated application.
+;
+; The release host is detected from the configured URL.
 ;
 ; Example configuration (shown as hints in the settings window):
 ;   https://github.com/anomalyco/opencode
+;   https://git.eden-emu.dev/eden-ci/nightly/releases
 ;   asset: opencode-windows-x64.zip
 ;   asset with version: marktext-win-x64-[$ver].zip
 ;
@@ -27,7 +30,7 @@
 ;   include\config.au3     gitupdater.ini load/save
 ;   include\http.au3       WinHttp GET client
 ;   include\json.au3       minimal JSON reading helpers
-;   include\github.au3     repository URL and release info
+;   include\gitsource.au3   repository URL, provider detection and release info
 ;   include\assets.au3     release asset name matching
 ;   include\download.au3   asset download and progress window
 ;   include\archive.au3    archive extraction and file installation
@@ -55,7 +58,7 @@
 #include "include\config.au3"
 #include "include\http.au3"
 #include "include\json.au3"
-#include "include\github.au3"
+#include "include\gitsource.au3"
 #include "include\assets.au3"
 #include "include\download.au3"
 #include "include\archive.au3"
@@ -82,6 +85,8 @@ Global $g_suppressErrors = 'no'
 
 ; Runtime state
 Global $g_lang = 'en'
+Global $g_repoProvider = ''
+Global $g_lastHttpStatus = 0
 Global $g_force = False
 Global $g_installPath = ''
 Global $g_downloadFile = ''
@@ -231,7 +236,7 @@ Func Main()
 		; When there's a network error, open settings window instead of just showing error
 		Local $errCode = @error
 		Local $httpStatus = @extended
-		Local $errorMsg = T('Could not read release information from GitHub:', '无法从 GitHub 获取 Release 信息：') & @CRLF & $g_softwareUrl
+		Local $errorMsg = T('Could not read release information:', '无法获取 Release 信息：') & @CRLF & $g_softwareUrl
 		If $httpStatus > 0 Then
 			$errorMsg &= @CRLF & @CRLF & T('HTTP Status: ', 'HTTP 状态：') & $httpStatus
 		EndIf
@@ -252,10 +257,10 @@ Func Main()
 	$tag = JsonGetString($json, 'tag_name')
 	$releaseName = JsonGetString($json, 'name')
 	$releaseUrl = JsonGetString($json, 'html_url')
-	$releaseBody = JsonGetString($json, 'body')
+	$releaseBody = ReleaseBody($json)
 	If $tag = '' Then $tag = $releaseName
 	If $tag = '' Then
-		NetworkError(T('The GitHub release does not contain a version tag:', 'GitHub Release 中没有版本标签：') & @CRLF & $g_softwareUrl)
+		NetworkError(T('The release does not contain a version tag:', '该 Release 中没有版本标签：') & @CRLF & $g_softwareUrl)
 		okExit()
 	EndIf
 
@@ -306,7 +311,7 @@ Func Main()
 		EndIf
 	EndIf
 
-	$assets = ParseAssets($json)
+	$assets = ParseReleaseAssets($json)
 	If UBound($assets) = 0 Then
 		FatalError(T('The release does not contain any downloadable assets:', '该 Release 没有可下载的资源：') & @CRLF & $g_softwareUrl)
 		okExit()

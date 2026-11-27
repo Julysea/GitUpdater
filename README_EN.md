@@ -1,8 +1,8 @@
 # GitUpdater
 
-GitUpdater is a Windows GitHub Releases updater inspired by [DCUpdater](../dcupdater).
+GitUpdater is a Windows Releases updater inspired by [DCUpdater](../dcupdater). It supports GitHub, Gitea/Forgejo (including Codeberg and self-hosted instances) and GitLab.
 
-It reads the latest release from **GitHub Releases**, downloads the specified release asset, extracts it into the folder containing `GitUpdater.exe` as needed, and shows download progress, release notes, and completion status.
+It reads the latest release from the release host, downloads the specified release asset, extracts it into the folder containing `GitUpdater.exe` as needed, and shows download progress, release notes, and completion status. The host is detected from the configured URL, so a Releases page URL can be pasted as is.
 
 **GitUpdater only handles updates, not launching software.** It does not start the target application after updating.
 
@@ -10,9 +10,10 @@ It reads the latest release from **GitHub Releases**, downloads the specified re
 
 * No built-in repository rules
 * The settings window has empty defaults for repository and asset file, with example hints displayed above the input boxes
-* Users fill in their own GitHub repository URL and asset file name
+* Users fill in their own repository URL (GitHub / Gitea / GitLab) and asset file name
 * Supports `[$ver]` / `[$tag]` version placeholders, suitable for repositories with versioned asset names
-* Reads the first entry of the Releases list, matching the order shown on the GitHub Releases page
+* Reads the first entry of the Releases list, matching the order shown on the Releases page
+* Uses download links from the release notes when a release has no attached assets
 * Compares only the latest tag string: skips if the same, updates if different; no rc/beta semantic version comparison
 * Shows "Already up to date" when no update is needed, with a "Settings" button (saving the configuration immediately re-checks for updates) and a "Close" button
 * The settings window has only two buttons, "Ok" and "Cancel": "Ok" saves and returns to the previous window; "Cancel" or closing the window discards changes and returns to the previous window. On first run and with `--settings`, both exit the program
@@ -23,7 +24,7 @@ It reads the latest release from **GitHub Releases**, downloads the specified re
 * Does not automatically start the updated application
 * Install directory is fixed to the folder containing `GitUpdater.exe`
 * Process check uses repository name + `.exe` (e.g., `opencode.exe`, `marktext.exe`)
-* Anonymous GitHub access, no Token required
+* Anonymous GitHub access, no Token required (the token is only sent to GitHub hosts)
 * Auto-extracts common archive formats (zip / 7z / rar / tar / tar.gz / tar.bz2 / tar.xz); other formats are downloaded only
 * Built-in Chinese/English support, no external translation files needed
 * Help button in the settings window opens the help page in the default browser; Chinese and English pages are embedded in the exe, the one matching the Windows UI language is chosen automatically, and it is extracted to the temp folder on first use (a `help_zh.html` / `help_en.html` next to the exe overrides the built-in page)
@@ -46,7 +47,7 @@ GitUpdater/
       config.au3            ; Configuration load/save (gitupdater.ini)
       http.au3              ; HTTP client (WinHttp)
       json.au3              ; JSON reading
-      github.au3            ; GitHub repository and release info
+      gitsource.au3         ; Repository URL parsing, host detection and release info
       assets.au3            ; Release asset name matching
       download.au3          ; Download and progress window
       archive.au3           ; Extraction and file installation
@@ -64,7 +65,7 @@ GitUpdater/
    * opencode: `D:\Apps\opencode\`
    * marktext: marktext's installation directory
 3. Run `GitUpdater.exe`. The first run shows the settings window.
-4. Fill in the **GitHub repository** and **asset file**. Example hints are displayed above the input boxes.
+4. Fill in the **repository URL** and **asset file**. Example hints are displayed above the input boxes.
 5. After clicking "Ok" to save, if a new version is found, a confirmation window appears with update details. (When the settings window was opened from a prompt via "Settings", "Cancel" returns to that prompt instead of exiting.)
 6. Click "Yes" to start downloading, or "No" / close the window to exit without updating.
 7. After updating, the window shows "Update complete". Click "Close" to exit.
@@ -77,7 +78,7 @@ GitUpdater/
 ### opencode
 
 ```text
-GitHub repository:
+Repository URL:
 https://github.com/anomalyco/opencode
 
 Asset file:
@@ -95,7 +96,7 @@ marktext-win-x64-0.24.0-rc.1.zip
 Using the `[$ver]` placeholder:
 
 ```text
-GitHub repository:
+Repository URL:
 https://github.com/marktext/marktext
 
 Asset file:
@@ -140,9 +141,9 @@ You can also add `--settings` at startup to reopen the settings window; "Ok" sav
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `SoftwareUrl` | empty | **Required**, GitHub repository URL of the software |
+| `SoftwareUrl` | empty | **Required**, repository URL (GitHub / Gitea / GitLab, a `/releases` suffix is fine) |
 | `AssetFile` | empty | **Required**, release asset file name; supports `[$ver]` / `[$tag]` placeholders |
-| `UserAgent` | `GitUpdater/1.0` | User-Agent for GitHub API requests |
+| `UserAgent` | `GitUpdater/1.0` | User-Agent for release host API requests |
 | `DownloadRetries` | `2` | Number of retries on download failure (total attempts = retries + 1) |
 
 ### `[Extract]`
@@ -182,7 +183,7 @@ The following configuration keys are now ignored:
 * `ExtractCommand`: Now auto-extracts based on archive format
 * `ReleaseTag`: Fixed to read the first entry of Releases
 * `AssetPattern`: Replaced by `AssetFile`, supports `[$ver]` / `[$tag]`
-* `ApiToken`: Anonymous GitHub access
+* `ApiToken`: Anonymous GitHub access (sent to GitHub hosts only)
 * `TranslationFile`: Chinese/English built-in
 
 ### New configuration keys
@@ -215,7 +216,7 @@ AssetFile=myapp-[$tag].zip
 ```
 
 * File name matching is case-insensitive.
-* Must exactly match the asset file name in the GitHub Release (after placeholder replacement).
+* Must exactly match the asset file name in the release (after placeholder replacement).
 * If not filled in or no match is found after replacement, a list of available assets is shown; when a closest file name is found, a window asks whether to download it.
 * The asset confirmation window offers "Settings" to change the asset name: "Ok" saves and re-checks, "Cancel" returns to that window.
 * No automatic selection; no built-in repository rules.
@@ -275,10 +276,12 @@ GitUpdater.exe --force
    * If the target file is read-only → prompt user, exit.
 5. If `Update` is not `yes` / `ask`, exit immediately.
 6. If "once per day" is enabled and a check has already been done today, exit immediately.
-7. Call the GitHub API:
-   * `GET /repos/{owner}/{repo}/releases?per_page=1`
+7. Detect the release host from the URL and call the matching API:
+   * GitHub: `GET https://api.github.com/repos/{owner}/{repo}/releases?per_page=1`
+   * Gitea/Forgejo: `GET {site}/api/v1/repos/{owner}/{repo}/releases?limit=1`
+   * GitLab: `GET {site}/api/v4/projects/{group%2Frepo}/releases?per_page=1`
    * Take the first entry of the Releases list
-8. Read `tag_name`, `body` (release notes), and `assets`.
+8. Read `tag_name`, the release notes (`body`, or `description` on GitLab), and `assets`; when there are no attachments, use the links from the release notes instead.
 9. Replace `[$ver]` / `[$tag]`, match assets by full file name.
 10. Compare the latest tag with `LastUpdatedVersion` (and verify `LastUpdatedRepo` still matches the configured repository):
     * Same and no `--force` → show "Already up to date":
@@ -310,7 +313,7 @@ GitUpdater.exe --force
 * No semantic version comparison; only tag strings are compared.
 * Non-archive formats are downloaded only; files are kept.
 * 7z/rar extraction requires 7-Zip to be installed; zip and tar formats use Windows built-in tools.
-* Unauthenticated GitHub API rate limit is approximately 60 requests per hour; no Token needed.
+* Unauthenticated GitHub API rate limit is approximately 60 requests per hour; no Token needed. `ApiToken` is only sent to GitHub hosts, never to other sites.
 * If installed in protected directories like `Program Files`, you may need to run as administrator.
 * The interface language is automatically selected based on Windows display language; no external translation files.
 * The source file contains Chinese strings and must be saved as **UTF-8 with BOM**.

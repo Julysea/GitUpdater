@@ -42,7 +42,7 @@
 <ol>
   <li>把 <code>GitUpdater.exe</code> 放到要更新的程序目录。</li>
   <li>运行 <code>GitUpdater.exe</code>，第一次运行会显示设置窗口。</li>
-  <li>填写 <b>GitHub 仓库</b> 和 <b>资源文件</b>，点“确定”。</li>
+  <li>填写 <b>仓库地址</b> 和 <b>资源文件</b>，点“确定”。</li>
   <li>发现新版本时弹出确认窗口，点“是”开始下载与解压；点“否”或关闭窗口则不更新。</li>
   <li>更新完成后窗口显示“更新完成”，点“关闭”退出。</li>
 </ol>
@@ -51,10 +51,10 @@
 <h2 id="settings">2. 设置项说明</h2>
 <table>
   <tr><th>项目</th><th>说明</th></tr>
-  <tr><td>GitHub 仓库</td><td><b>必填</b>。仓库地址，例如 <code>https://github.com/anomalyco/opencode</code>。程序读取该仓库 Releases 列表的<b>第一条</b>（与 GitHub 页面顺序一致）。</td></tr>
+  <tr><td>仓库地址</td><td><b>必填</b>。支持 GitHub、Gitea/Forgejo（含 Codeberg、自建实例）和 GitLab，例如 <code>https://github.com/anomalyco/opencode</code>、<code>https://git.eden-emu.dev/eden-ci/nightly/releases</code>。也可以直接粘贴 Releases 页面地址，程序会按网址自动识别平台，并读取 Releases 列表的<b>第一条</b>（与发布页顺序一致）。</td></tr>
   <tr><td>资源文件</td><td><b>必填</b>。Release 中要下载的资源文件名，必须与发布页上的文件名一致（不区分大小写）。支持版本占位符，见 <a href="#asset">第 3 节</a>。</td></tr>
   <tr><td>更新</td><td><code>是</code>：发现新版本直接更新；<code>询问</code>：先弹出确认窗口（默认）；<code>否</code>：不检查、不更新，直接退出。</td></tr>
-  <tr><td>每天只检查一次更新</td><td>勾选后，同一天内重复运行会直接退出，避免频繁请求 GitHub。</td></tr>
+  <tr><td>每天只检查一次更新</td><td>勾选后，同一天内重复运行会直接退出，避免频繁请求发布站点。</td></tr>
   <tr><td>解压后删除下载的压缩包</td><td>压缩包解压成功后删除下载的文件；只下载模式（非压缩包格式）会保留文件。</td></tr>
   <tr><td>自动去掉压缩包的单层根目录</td><td>压缩包内只有一个顶层文件夹时，把该文件夹里的内容直接放到安装目录，而不是多套一层目录。</td></tr>
   <tr><td>指定释放内容路径</td><td>只提取压缩包里某个子目录的内容，留空表示全部提取。见 <a href="#binpath">第 4 节</a>。</td></tr>
@@ -119,7 +119,7 @@ GitUpdater.exe --force</pre>
   <tr><td><code>[General] LogFile</code></td><td><code>gitupdater.log</code></td><td>日志路径，留空关闭日志</td></tr>
   <tr><td><code>[Internet] SoftwareUrl</code></td><td>空</td><td>仓库地址</td></tr>
   <tr><td><code>[Internet] AssetFile</code></td><td>空</td><td>资源文件名</td></tr>
-  <tr><td><code>[Internet] UserAgent</code></td><td><code>GitUpdater/1.0</code></td><td>GitHub API 请求的 User-Agent</td></tr>
+  <tr><td><code>[Internet] UserAgent</code></td><td><code>GitUpdater/1.0</code></td><td>发布站点 API 请求的 User-Agent</td></tr>
   <tr><td><code>[Internet] DownloadRetries</code></td><td><code>2</code></td><td>下载失败重试次数（总尝试次数 = 重试次数 + 1）</td></tr>
   <tr><td><code>[Extract] StripRootFolder</code></td><td><code>yes</code></td><td>去掉单层根目录</td></tr>
   <tr><td><code>[Extract] DeleteDownloadedFiles</code></td><td><code>yes</code></td><td>解压后删除压缩包</td></tr>
@@ -129,8 +129,8 @@ GitUpdater.exe --force</pre>
 <p>运行时还会写入 <code>LastUpdateDate</code>、<code>LastUpdatedVersion</code>、<code>LastUpdatedRepo</code>、<code>LastReleaseUrl</code>，用于版本比较。</p>
 
 <h2 id="faq">9. 常见问题</h2>
-<h3>提示“无法从 GitHub 获取 Release 信息”</h3>
-<p>检查网络、代理，以及仓库地址是否正确；日志中会记录 HTTP 状态码。GitHub API 匿名访问有频率限制，稍后重试即可。</p>
+<h3>提示“无法获取 Release 信息”</h3>
+<p>检查网络、代理，以及仓库地址是否正确；日志中会记录识别到的平台、API 地址和 HTTP 状态码。若 Release 没有附带资源文件、只在更新说明里给出下载链接，程序会自动使用这些链接。GitHub API 匿名访问有频率限制，稍后重试即可。</p>
 <h3>提示“没有找到匹配的资源文件”</h3>
 <p>对照 Releases 页面核对文件名，注意 <code>[$ver]</code> 不含开头的 <code>v</code>、大小写与扩展名是否一致。</p>
 <h3>提示目标程序正在运行 / 文件只读</h3>
